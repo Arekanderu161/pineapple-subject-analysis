@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUBJECT ANALYSIS // MULTI-MODE HUD</title>
+  <style>
+    :root {
+      --bg: #070b0a;
+      --panel: rgba(9, 16, 15, 0.86);
+      --border: rgba(99, 245, 221, 0.34);
+      --accent: #63F5DD;
+      --text: #EEF7F5;
+      --muted: #8AA6A1;
+      --danger: #FF4D4D;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 25%, #111c1a 0%, #050807 100%);
+      color: var(--text);
+      font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", "Courier New", monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 18px 16px 32px;
+      gap: 14px;
+      user-select: none;
+    }
+
+    .topbar {
+      width: 100%;
+      max-width: 1120px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 6px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .rec-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 10px var(--danger);
+      animation: blink 1.1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    .mode-switcher {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 12px;
+      font-family: inherit;
+      font-size: 11.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.16s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: var(--accent);
+    }
+
+    .btn.active {
+      background: var(--accent);
+      color: #06100e;
+      border-color: var(--accent);
+      font-weight: 700;
+      box-shadow: 0 0 14px rgba(99, 245, 221, 0.35);
+    }
+
+    .controls-row {
+      width: 100%;
+      max-width: 1120px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 6px;
+    }
+
+    .stage-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .stage-pill {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 5px 9px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.15s;
+    }
+
+    .stage-pill.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .action-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .viewport-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 1120px;
+      display: flex;
+      justify-content: center;
+      background: #040706;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      box-shadow: 0 20px 55px rgba(0, 0, 0, 0.65);
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 998px;
+      height: auto;
+      aspect-ratio: 998 / 748;
+      border-radius: 3px;
+      display: block;
+      background: #0a0f0e;
+    }
+
+    .footer-bar {
+      width: 100%;
+      max-width: 1120px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-size: 11.5px;
+      color: var(--muted);
+      padding: 4px 4px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .status-badge {
+      color: var(--accent);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="rec-dot" id="recDot"></span>
+      <span id="brandTitle">SURVEILLANCE HUD // SUBJECT ANALYSIS</span>
+    </div>
+
+    <div class="mode-switcher" id="modeSwitcher">
+      <button class="btn active" data-mode="cctv">01 · CCTV Наблюдение</button>
+      <button class="btn" data-mode="drone">02 · Военный Дрон (UAV)</button>
+      <button class="btn" data-mode="sniper">03 · Баллистический Прицел</button>
+      <button class="btn" data-mode="medical">04 · Медицинский Био-Сканер</button>
+      <button class="btn" data-mode="cyber">05 · Кибер-Визор (Thermal)</button>
+    </div>
+  </header>
+
+  <section class="controls-row">
+    <div class="stage-pills" id="stagePills">
+      <button class="stage-pill active" data-stage="auto">AUTO LOOP (15s)</button>
+      <button class="stage-pill" data-stage="0">01 ACQUIRE</button>
+      <button class="stage-pill" data-stage="1">02 SILHOUETTE</button>
+      <button class="stage-pill" data-stage="2">03 STRUCTURE</button>
+      <button class="stage-pill" data-stage="3">04 FEATURES</button>
+      <button class="stage-pill" data-stage="4">05 PALETTE</button>
+      <button class="stage-pill" data-stage="5">06 IDENTIFY</button>
+    </div>
+
+    <div class="action-group">
+      <button class="btn" id="playPauseBtn">⏸ ПАУЗА</button>
+      <button class="btn" id="soundBtn">🔇 ЗВУК: ВЫКЛ</button>
+      <label class="btn" for="uploadInput">📁 ЗАГРУЗИТЬ СВОЁ ФОТО</label>
+      <input type="file" id="uploadInput" accept="image/*" />
+      <button class="btn" id="recordBtn">⏺ ЭКСПОРТ WEBM</button>
+    </div>
+  </section>
+
+  <main class="viewport-wrap">
+    <canvas id="hudCanvas" width="998" height="748"></canvas>
+  </main>
+
+  <footer class="footer-bar">
+    <div>РЕЖИМ: <span class="status-badge" id="modeStatusText">CAM 07 / BOTANICAL UNIT (CCTV)</span></div>
+    <div>998 × 748 · БЕСШОВНЫЙ ЦИКЛ · K-MEANS КЛАСТЕРИЗАЦИЯ · DELAUNAY MESH В РЕАЛЬНОМ ВРЕМЕНИ</div>
+  </footer>
+
+  <script>
+    const W = 998;
+    const H = 748;
+    const DURATION = 15.0; // 15-second seamless loop
+    const canvas = document.getElementById('hudCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Mode Configurations
+    const MODES = {
+      cctv: {
+        id: 'cctv',
+        name: 'CAM 07 / BOTANICAL UNIT',
+        sub: 'SUBJECT ANALYSIS   /   OPTICAL INTELLIGENCE',
+        accent: '#63F5DD',
+        accentRgb: [99, 245, 221],
+        secondary: '#EEF7F5',
+        bgTint: [14, 24, 21],
+        gridColor: 'rgba(99, 245, 221, 0.07)',
+        unitCode: 'P-017',
+        speciesLabel: 'ANANAS COMOSUS',
+        footerRight: 'OPTICAL SCAN / ARCHIVE 006',
+        stages: ['ACQUIRE', 'SILHOUETTE', 'STRUCTURE', 'FEATURES', 'PALETTE', 'IDENTIFY'],
+        stageDescs: [
+          ['OPTICAL ACQUISITION', 'SEARCH / TRACK / LOCK'],
+          ['SEMANTIC SEGMENTATION', 'FOREGROUND MASK ACTIVE'],
+          ['GEOMETRY RECONSTRUCTION', 'SURFACE / AXIS / JOINTS'],
+          ['DETAIL INSPECTION', 'ORIGINAL COLOR RESTORED'],
+          ['CHROMATIC SIGNATURE', 'K-MEANS / K = 06'],
+          ['CLASSIFICATION COMPLETE', 'RECORD SEALED']
+        ],
+        boxLabels: ['CROWN 98.2%', 'BODY 99.1%', 'BASE 96.9%'],
+        features: [
+          { title: 'SPIKED CROWN', sub: 'RADIAL LEAF CLUSTER', rx: 0.53, ry: 0.23 },
+          { title: 'DIAMOND EYES', sub: 'REPEATING SURFACE CELLS', rx: 0.55, ry: 0.51 },
+          { title: 'GOLD RIND', sub: 'YELLOW / OCHRE TONES', rx: 0.57, ry: 0.63 },
+          { title: 'OVOID BODY', sub: 'TAPERED FRUIT PROFILE', rx: 0.58, ry: 0.73 },
+          { title: 'ROUNDED BASE', sub: 'CONTINUOUS LOWER CONTOUR', rx: 0.49, ry: 0.83 }
+        ],
+        idCard: {
+          header: 'TARGET LOCKED',
+          subject: 'P-017',
+          classVal: 'PINEAPPLE',
+          speciesTitle: 'SPECIES',
+          speciesVal: 'A. COMOSUS',
+          threatTitle: 'THREAT',
+          threatVal: 'LOW / 00',
+          matchVal: '99.8%'
+        }
+      },
+      drone: {
+        id: 'drone',
+        name: 'MQ-9 REAPER // ISR-OPTICS',
+        sub: 'TACTICAL UAV FEED   /   ALT 14,200 FT   /   FLIR + EO',
+        accent: '#FFB000',
+        accentRgb: [255, 176, 0],
+        secondary: '#FFF3D6',
+        bgTint: [24, 19, 10],
+        gridColor: 'rgba(255, 176, 0, 0.08)',
+        unitCode: 'TGT-09',
+        speciesLabel: 'GRID 38T MK 8492 1104',
+        footerRight: 'LASER DESIGNATOR / STANDBY',
+        stages: ['LOCK-ON', 'IR-MASK', 'AIRFRAME', 'TELEMETRY', 'THERMAL SIG', 'STRIKE ID'],
+        stageDescs: [
+          ['GIMBAL SLEW TO TARGET', 'AUTO-TRACKING ENGAGED'],
+          ['CONTRAST ISOLATION', 'GROUND CLUTTER SUPPRESSED'],
+          ['3D VOLUMETRIC WIREFRAME', 'RADAR CROSS-SECTION'],
+          ['HIGH-GAIN ZOOM 4.0X', 'STRUCTURAL HARDPOINTS'],
+          ['SPECTRAL REFLECTANCE', 'ALBEDO CLUSTERS K=06'],
+          ['IFF INTERROGATION', 'COLLATERAL ESTIMATE ZERO']
+        ],
+        boxLabels: ['UPPER PLUME 97.4%', 'CORE MASS 99.6%', 'GROUND CONTACT 98.1%'],
+        features: [
+          { title: 'UPPER FOLIAGE', sub: 'LOW RADAR RETURN', rx: 0.53, ry: 0.23 },
+          { title: 'HEXAGONAL ARMOR', sub: 'DENSE CELLULAR LATTICE', rx: 0.55, ry: 0.51 },
+          { title: 'SOLAR ALBEDO', sub: 'HIGH THERMAL RETENTION', rx: 0.57, ry: 0.63 },
+          { title: 'CYLINDRICAL CORE', sub: 'VERTICAL CENTER OF MASS', rx: 0.58, ry: 0.73 },
+          { title: 'STATIC ANCHOR', sub: 'VELOCITY 0.0 KTS', rx: 0.49, ry: 0.83 }
+        ],
+        idCard: {
+          header: 'TARGET DESIGNATED',
+          subject: 'TGT-09',
+          classVal: 'STATIC ORGANIC',
+          speciesTitle: 'GRID',
+          speciesVal: '38T-8492',
+          threatTitle: 'THREAT',
+          threatVal: 'NONE / CIV',
+          matchVal: '99.4%'
+        }
+      },
+      sniper: {
+        id: 'sniper',
+        name: 'BALLISTIC OPTIC // MK-IV 12-40X',
+        sub: 'WIND 2.4 M/S 085°   /   RANGE 640M   /   CORIOLIS +0.2 MIL',
+        accent: '#FF3B47',
+        accentRgb: [255, 59, 71],
+        secondary: '#FFE5E7',
+        bgTint: [24, 10, 12],
+        gridColor: 'rgba(255, 59, 71, 0.08)',
+        unitCode: 'MRK-01',
+        speciesLabel: 'ELEV +3.8 MIL // WIND -0.6 MIL',
+        footerRight: 'LASER RANGEFINDER / ACTIVE',
+        stages: ['RANGE', 'ISOLATE', 'BALLISTICS', 'MAGNIFY', 'CONTRAST', 'SOLUTION'],
+        stageDescs: [
+          ['OPTICAL ZEROING', 'RETICLE STABILIZED'],
+          ['SILHOUETTE EXTRACTION', 'TARGET CONTRAST LOCK'],
+          ['IMPACT VECTOR MESH', 'STRUCTURAL DENSITY MAP'],
+          ['FOCAL PLANE ZOOM', 'SURFACE DEFLECTION CHECK'],
+          ['CAMOUFLAGE BREAKDOWN', 'PIGMENT SEPARATION'],
+          ['FIRING SOLUTION READY', 'PROBABILITY OF HIT 99.9%']
+        ],
+        boxLabels: ['CREST ZONE 96.8%', 'CENTER MASS 99.8%', 'PEDESTAL 95.4%'],
+        features: [
+          { title: 'FRINGE CANOPY', sub: 'WIND INDICATOR ZONE', rx: 0.53, ry: 0.23 },
+          { title: 'AIMPOINT ALPHA', sub: 'PRIMARY CENTER OF MASS', rx: 0.55, ry: 0.51 },
+          { title: 'FIBROUS CORTEX', sub: 'DENSITY 1.04 G/CM3', rx: 0.57, ry: 0.63 },
+          { title: 'LOWER MASS', sub: 'SECONDARY IMPACT POINT', rx: 0.58, ry: 0.73 },
+          { title: 'BASE PLANE', sub: 'ZERO ELEVATION REF', rx: 0.49, ry: 0.83 }
+        ],
+        idCard: {
+          header: 'SOLUTION LOCKED',
+          subject: 'MRK-01',
+          classVal: 'BOTANICAL TARGET',
+          speciesTitle: 'RANGE',
+          speciesVal: '640.0 M',
+          threatTitle: 'WINDAGE',
+          threatVal: '-0.6 MIL',
+          matchVal: '99.9%'
+        }
+      },
+      medical: {
+        id: 'medical',
+        name: 'BIO-SCANNER // MRI-SPECTRAL v4.2',
+        sub: 'CELLULAR TOMOGRAPHY   /   NON-INVASIVE BIO-ASSAY',
+        accent: '#38B6FF',
+        accentRgb: [56, 182, 255],
+        secondary: '#E6F6FF',
+        bgTint: [10, 19, 28],
+        gridColor: 'rgba(56, 182, 255, 0.08)',
+        unitCode: 'BIO-402',
+        speciesLabel: 'BROMELIACEAE // BROMELAIN +',
+        footerRight: 'TOMOGRAPHY SLICE / 0.5 MM',
+        stages: ['INTAKE', 'TOMOGRAPHY', 'MORPHOLOGY', 'HISTOLOGY', 'BIO-CHROME', 'DIAGNOSIS'],
+        stageDescs: [
+          ['SPECIMEN POSITIONING', 'ISOCENTER CALIBRATION'],
+          ['TISSUE SEGMENTATION', 'EPIDERMAL MASKING'],
+          ['VASCULAR & AXIAL MESH', 'BIOMECHANICAL ANGLES'],
+          ['MICRO-HISTOLOGY 2.9X', 'PERICARP CELLULAR MATRIX'],
+          ['PIGMENT CHROMATOGRAPHY', 'CAROTENOID / CHLOROPHYLL'],
+          ['PATHOLOGY CLEAR', 'SPECIMEN VIABILITY 99.8%']
+        ],
+        boxLabels: ['APICAL MERISTEM 98.9%', 'SYNCARP CORTEX 99.5%', 'PEDUNCLE BASE 97.6%'],
+        features: [
+          { title: 'CHLOROPHYLL CROWN', sub: 'PHOTOSYNTHETIC ACTIVE', rx: 0.53, ry: 0.23 },
+          { title: 'FRUITLETS (EYES)', sub: 'COALESCED BERRY MATRIX', rx: 0.55, ry: 0.51 },
+          { title: 'CAROTENOID EPIDERMIS', sub: 'MATURATION INDEX HIGH', rx: 0.57, ry: 0.63 },
+          { title: 'PARENCPHYMA CORE', sub: 'HIGH BROMELAIN ENZYME', rx: 0.58, ry: 0.73 },
+          { title: 'VASCULAR BUNDLE', sub: 'BASAL NUTRIENT INTAKE', rx: 0.49, ry: 0.83 }
+        ],
+        idCard: {
+          header: 'BIO-ASSAY COMPLETE',
+          subject: 'BIO-402',
+          classVal: 'SYNCARP FRUIT',
+          speciesTitle: 'ENZYME',
+          speciesVal: 'BROMELAIN',
+          threatTitle: 'TOXICITY',
+          threatVal: '0.00% SAFE',
+          matchVal: '99.8%'
+        }
+      },
+      cyber: {
+        id: 'cyber',
+        name: 'KIROSHI OPTICS // MK.V NETWATCH',
+        sub: 'NEURAL LINK ACTIVE   /   DEEP PACKET & BIOMETRIC SCAN',
+        accent: '#00FF9C',
+        accentRgb: [0, 255, 156],
+        secondary: '#FF2A85',
+        bgTint: [18, 10, 24],
+        gridColor: 'rgba(0, 255, 156, 0.08)',
+        unitCode: 'NC-2077',
+        speciesLabel: 'SYNTH-ORGANIC // VERIFIED REAL',
+        footerRight: 'ICEBREAKER DAEMON / READY',
+        stages: ['PING', 'MASK_DAEMON', 'WIREFRAME', 'DEEP_ZOOM', 'HEX_DUMP', 'DOSSIER'],
+        stageDescs: [
+          ['OPTICAL SYNAPSE LOCK', 'TARGET SIGNATURE PINGED'],
+          ['NEURAL SUBSTRATE MASK', 'BACKGROUND DE-RENDERED'],
+          ['POLYGONAL TOPOLOGY', 'CYBERWARE SCAN: NEGATIVE'],
+          ['MICRO-OPTIC ENHANCE', 'ORGANIC CELL VERIFICATION'],
+          ['CHROMATIC HEX DUMP', 'RAW PIXEL CLUSTERING'],
+          ['NETWATCH DB MATCH', 'RARE REAL-FRUIT ARTIFACT']
+        ],
+        boxLabels: ['ORGANIC_CROWN 99.1%', 'BIOMASS_CORE 99.7%', 'ROOT_NODE 98.4%'],
+        features: [
+          { title: 'KERATIN-LIKE SPIKES', sub: 'NATURAL DEFENSE MESH', rx: 0.53, ry: 0.23 },
+          { title: 'FRACTAL TESSELLATION', sub: 'FIBONACCI SPIRAL LATTICE', rx: 0.55, ry: 0.51 },
+          { title: 'NATURAL CHROMA', sub: 'UNSYNTHESIZED PIGMENT', rx: 0.57, ry: 0.63 },
+          { title: 'HIGH WATER BIOMASS', sub: 'VALUATION: 1,400 EDDIES', rx: 0.58, ry: 0.73 },
+          { title: 'STEM INTERFACE', sub: 'HARVEST CUT DETECTED', rx: 0.49, ry: 0.83 }
+        ],
+        idCard: {
+          header: 'DOSSIER DECRYPTED',
+          subject: 'NC-2077',
+          classVal: 'REAL PINEAPPLE',
+          speciesTitle: 'ORIGIN',
+          speciesVal: 'BIO-FARM 04',
+          threatTitle: 'BOUNTY',
+          threatVal: '1400 E$',
+          matchVal: '99.9%'
+        }
+      }
+    };
+
+    let currentMode = MODES.cctv;
+    let lockedStage = 'auto';
+    let isPlaying = true;
+    let startTime = performance.now();
+    let pausedElapsed = 0;
+
+    // Subject analysis computed data
+    let subjectReady = false;
+    let sourceImg = new Image();
+    let subjectData = null;
+
+    // Web Audio Synthesizer
+    let audioCtx = null;
+    let soundEnabled = false;
+    let lastBeepStage = -1;
+
+    function triggerStageSound(stageIdx) {
+      if (!soundEnabled) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = currentMode.id === 'sniper' ? 'sawtooth' : 'sine';
+      const baseFreq = { cctv: 680, drone: 520, sniper: 440, medical: 880, cyber: 740 }[currentMode.id] || 660;
+      osc.frequency.setValueAtTime(baseFreq + stageIdx * 95, now);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq + stageIdx * 130, now + 0.09);
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    }
+
+    // Load source image and run automatic segmentation + mesh + k-means palette extraction
+    sourceImg.crossOrigin = 'anonymous';
+    sourceImg.onload = () => {
+      analyzeImage(sourceImg);
+    };
+    sourceImg.src = 'source.png';
+
+    function analyzeImage(img) {
+      // Fit image inside 998x748 canvas
+      const off = document.createElement('canvas');
+      off.width = W;
+      off.height = H;
+      const octx = off.getContext('2d');
+
+      // Fill background corner color then draw centered image
+      octx.drawImage(img, 0, 0, W, H);
+      const imgData = octx.getImageData(0, 0, W, H);
+      const data = imgData.data;
+
+      // Sample corners to estimate background color
+      const corners = [
+        [10, 10], [W - 10, 10], [10, H - 10], [W - 10, H - 10],
+        [40, H / 2], [W - 40, H / 2]
+      ];
+      let bgR = 0, bgG = 0, bgB = 0;
+      for (const [cx, cy] of corners) {
+        const idx = (Math.floor(cy) * W + Math.floor(cx)) * 4;
+        bgR += data[idx];
+        bgG += data[idx + 1];
+        bgB += data[idx + 2];
+      }
+      bgR /= corners.length;
+      bgG /= corners.length;
+      bgB /= corners.length;
+
+      // Foreground mask & edge detection
+      const mask = new Uint8Array(W * H);
+      let minX = W, minY = H, maxX = 0, maxY = 0;
+      const fgSamples = [];
+
+      for (let y = 15; y < H - 15; y++) {
+        for (let x = Math.floor(W * 0.22); x < Math.floor(W * 0.78); x++) {
+          const idx = (y * W + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
+          const sat = Math.max(r, g, b) - Math.min(r, g, b);
+          if (dist > 34 || sat > 38) {
+            mask[y * W + x] = 1;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            if ((x + y) % 7 === 0) {
+              fgSamples.push([r, g, b, x, y]);
+            }
+          }
+        }
+      }
+
+      // Fallback bounds if custom uploaded photo covers full frame
+      if (maxX <= minX || maxY <= minY) {
+        minX = Math.floor(W * 0.3);
+        maxX = Math.floor(W * 0.7);
+        minY = Math.floor(H * 0.12);
+        maxY = Math.floor(H * 0.85);
+      }
+
+      // Create desaturated canvas
+      const desatCanvas = document.createElement('canvas');
+      desatCanvas.width = W;
+      desatCanvas.height = H;
+      const dctx = desatCanvas.getContext('2d');
+      const desatImg = dctx.createImageData(W, H);
+
+      // Create foreground isolated color canvas & flat silhouette canvas & edge canvas
+      const fgColorCanvas = document.createElement('canvas');
+      fgColorCanvas.width = W;
+      fgColorCanvas.height = H;
+      const fgCtx = fgColorCanvas.getContext('2d');
+      const fgImg = fgCtx.createImageData(W, H);
+
+      const edgePoints = [];
+
+      for (let y = 1; y < H - 1; y++) {
+        for (let x = 1; x < W - 1; x++) {
+          const p = y * W + x;
+          const idx = p * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+          // Desaturated feed
+          desatImg.data[idx] = lum * 0.92;
+          desatImg.data[idx + 1] = lum * 0.97;
+          desatImg.data[idx + 2] = lum * 0.93;
+          desatImg.data[idx + 3] = 255;
+
+          if (mask[p]) {
+            fgImg.data[idx] = r;
+            fgImg.data[idx + 1] = g;
+            fgImg.data[idx + 2] = b;
+            fgImg.data[idx + 3] = 255;
+
+            const isBoundary = !mask[p - 1] || !mask[p + 1] || !mask[p - W] || !mask[p + W];
+            if (isBoundary && (x + y) % 3 === 0) {
+              edgePoints.push([x, y]);
+            }
+          }
+        }
+      }
+      dctx.putImageData(desatImg, 0, 0);
+      fgCtx.putImageData(fgImg, 0, 0);
+
+      // Build triangulated mesh nodes inside mask
+      const meshNodes = [];
+      const stepX = 24;
+      const stepY = 24;
+      for (let y = minY; y <= maxY; y += stepY) {
+        for (let x = minX; x <= maxX; x += stepX) {
+          const jx = Math.min(W - 2, Math.max(1, Math.round(x + Math.sin(y * 0.13) * 6)));
+          const jy = Math.min(H - 2, Math.max(1, Math.round(y + Math.cos(x * 0.17) * 6)));
+          if (mask[jy * W + jx]) {
+            meshNodes.push([jx, jy]);
+          }
+        }
+      }
+
+      // Add sparse boundary nodes
+      for (let i = 0; i < edgePoints.length; i += 9) {
+        meshNodes.push(edgePoints[i]);
+      }
+
+      // Connect nearby mesh nodes to form wireframe triangles
+      const meshEdges = [];
+      for (let i = 0; i < meshNodes.length; i++) {
+        const [x1, y1] = meshNodes[i];
+        let neighbors = [];
+        for (let j = i + 1; j < meshNodes.length; j++) {
+          const [x2, y2] = meshNodes[j];
+          const d = Math.hypot(x2 - x1, y2 - y1);
+          if (d > 10 && d < 42) {
+            neighbors.push({ j, d, x2, y2 });
+          }
+        }
+        neighbors.sort((a, b) => a.d - b.d);
+        for (let k = 0; k < Math.min(3, neighbors.length); k++) {
+          meshEdges.push([x1, y1, neighbors[k].x2, neighbors[k].y2]);
+        }
+      }
+
+      // Run k-means (k=6) over foreground pixels
+      const k = 6;
+      let centroids = [
+        [59, 81, 29],
+        [149, 124, 6],
+        [127, 126, 81],
+        [168, 150, 61],
+        [133, 105, 28],
+        [145, 166, 113]
+      ];
+      let counts = new Array(k).fill(0);
+      let samplePositions = new Array(k).fill(null).map(() => [ (minX + maxX)/2, (minY + maxY)/2 ]);
+
+      if (fgSamples.length > 30) {
+        for (let iter = 0; iter < 8; iter++) {
+          const sums = Array.from({ length: k }, () => [0, 0, 0, 0, 0, 0]);
+          for (const [r, g, b, sx, sy] of fgSamples) {
+            let best = 0, bestD = 1e9;
+            for (let c = 0; c < k; c++) {
+              const d = (r - centroids[c][0]) ** 2 + (g - centroids[c][1]) ** 2 + (b - centroids[c][2]) ** 2;
+              if (d < bestD) { bestD = d; best = c; }
+            }
+            sums[best][0] += r;
+            sums[best][1] += g;
+            sums[best][2] += b;
+            sums[best][3] += 1;
+            sums[best][4] += sx;
+            sums[best][5] += sy;
+          }
+          for (let c = 0; c < k; c++) {
+            if (sums[c][3] > 0) {
+              centroids[c] = [
+                Math.round(sums[c][0] / sums[c][3]),
+                Math.round(sums[c][1] / sums[c][3]),
+                Math.round(sums[c][2] / sums[c][3])
+              ];
+              counts[c] = sums[c][3];
+              samplePositions[c] = [
+                Math.round(sums[c][4] / sums[c][3]),
+                Math.round(sums[c][5] / sums[c][3])
+              ];
+            }
+          }
+        }
+      }
+
+      const totalSamples = counts.reduce((a, b) => a + b, 0) || 1;
+      const palette = centroids.map((rgb, i) => {
+        const hex = '#' + rgb.map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('').toUpperCase();
+        const pct = ((counts[i] / totalSamples) * 100).toFixed(1);
+        return {
+          rgb,
+          hex,
+          pct: `${pct}% OF SUBJECT`,
+          origin: samplePositions[i]
+        };
+      }).sort((a, b) => parseFloat(b.pct) - parseFloat(a.pct));
+
+      const cx = (minX + maxX) * 0.5;
+      const hSpan = maxY - minY;
+      const landmarks = {
+        apex: [cx + 8, minY + hSpan * 0.04],
+        crownLeft: [minX + (maxX - minX) * 0.22, minY + hSpan * 0.23],
+        crownRight: [minX + (maxX - minX) * 0.78, minY + hSpan * 0.24],
+        neck: [cx, minY + hSpan * 0.43],
+        leftHip: [minX + (maxX - minX) * 0.27, minY + hSpan * 0.67],
+        rightHip: [minX + (maxX - minX) * 0.73, minY + hSpan * 0.68],
+        base: [cx, maxY - hSpan * 0.03]
+      };
+
+      subjectData = {
+        colorCanvas: off,
+        desatCanvas,
+        fgColorCanvas,
+        mask,
+        bounds: { minX, minY, maxX, maxY, cx, cy: (minY + maxY) * 0.5 },
+        edgePoints,
+        meshNodes,
+        meshEdges,
+        palette,
+        landmarks
+      };
+      subjectReady = true;
+    }
+
+    // Helper drawing utilities
+    function rgba(rgb, a) {
+      return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+    }
+
+    function drawCornerBox(x, y, w, h, color, len = 10, lineW = 1.5) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineW;
+      ctx.beginPath();
+      // TL
+      ctx.moveTo(x, y + len); ctx.lineTo(x, y); ctx.lineTo(x + len, y);
+      // TR
+      ctx.moveTo(x + w - len, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + len);
+      // BR
+      ctx.moveTo(x + w, y + h - len); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - len, y + h);
+      // BL
+      ctx.moveTo(x + len, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - len);
+      ctx.stroke();
+    }
+
+    function drawPanel(x, y, w, h, accentRgb) {
+      ctx.fillStyle = 'rgba(8, 13, 12, 0.84)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = rgba(accentRgb, 0.36);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+
+    function drawGridBackground(alpha = 1) {
+      const [br, bg, bb] = currentMode.bgTint;
+      ctx.fillStyle = `rgba(${br}, ${bg}, ${bb}, ${alpha})`;
+      ctx.fillRect(0, 0, W, H);
+
+      ctx.strokeStyle = currentMode.gridColor;
+      ctx.lineWidth = 1;
+      const step = 32;
+      ctx.beginPath();
+      for (let x = 0; x < W; x += step) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, H);
+      }
+      for (let y = 0; y < H; y += step) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(W, y + 0.5);
+      }
+      ctx.stroke();
+    }
+
+    function drawModeOverlay(t, stageIdx) {
+      const acc = currentMode.accent;
+      const accRgb = currentMode.accentRgb;
+      const b = subjectData.bounds;
+
+      if (currentMode.id === 'drone') {
+        // Pitch ladder & compass tape at top center
+        ctx.save();
+        ctx.strokeStyle = rgba(accRgb, 0.45);
+        ctx.fillStyle = rgba(accRgb, 0.75);
+        ctx.font = '10px monospace';
+        const compassY = 104;
+        ctx.beginPath();
+        ctx.moveTo(360, compassY);
+        ctx.lineTo(640, compassY);
+        for (let i = -4; i <= 4; i++) {
+          const tx = 500 + i * 30 + Math.sin(t * 0.7) * 12;
+          ctx.moveTo(tx, compassY - 4);
+          ctx.lineTo(tx, compassY + 4);
+        }
+        ctx.stroke();
+        ctx.fillText('HDG 248° WSW', 466, compassY - 8);
+        ctx.restore();
+      } else if (currentMode.id === 'sniper') {
+        // Mil-dot ballistic crosshair across subject
+        ctx.save();
+        ctx.strokeStyle = rgba(accRgb, 0.38);
+        ctx.lineWidth = 1;
+        const cx = b.cx, cy = b.cy;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 185, 0, Math.PI * 2);
+        ctx.moveTo(cx - 220, cy); ctx.lineTo(cx + 220, cy);
+        ctx.moveTo(cx, cy - 220); ctx.lineTo(cx, cy + 220);
+        for (let m = -160; m <= 160; m += 32) {
+          if (m === 0) continue;
+          ctx.moveTo(cx + m, cy - 4); ctx.lineTo(cx + m, cy + 4);
+          ctx.moveTo(cx - 4, cy + m); ctx.lineTo(cx + 4, cy + m);
+        }
+        ctx.stroke();
+        ctx.restore();
+      } else if (currentMode.id === 'medical') {
+        // ECG / Bio-waveform bar in lower right
+        ctx.save();
+        ctx.strokeStyle = rgba(accRgb, 0.65);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const wx = 700, wy = 650, ww = 240;
+        for (let i = 0; i <= ww; i += 3) {
+          const phase = (i * 0.08 - t * 6) % (Math.PI * 2);
+          const pulse = Math.exp(-Math.pow((phase + Math.PI) % (Math.PI * 2) - Math.PI, 2) * 18) * -22;
+          const py = wy + Math.sin(i * 0.05 - t * 4) * 3 + pulse;
+          if (i === 0) ctx.moveTo(wx + i, py);
+          else ctx.lineTo(wx + i, py);
+        }
+        ctx.stroke();
+        ctx.fillStyle = rgba(accRgb, 0.7);
+        ctx.font = '10px monospace';
+        ctx.fillText('BIO-RESONANCE // 1.42 HZ NOMINAL', wx, wy + 18);
+        ctx.restore();
+      } else if (currentMode.id === 'cyber') {
+        // Cybernetic hex stream on top right margin
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 42, 133, 0.65)';
+        ctx.font = '10px monospace';
+        const hexTick = Math.floor(t * 10);
+        ctx.fillText(`0x${((hexTick * 4099) & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')} // ICE_PROTOCOL_v9`, 700, 118);
+        ctx.restore();
+      }
+    }
+
+    function renderFrame(t) {
+      if (!subjectReady) return;
+
+      // Determine current stage (0..5), each 2.5 seconds in a 15s loop
+      let stageIdx = Math.min(5, Math.floor(t / 2.5));
+      let stageProgress = (t - stageIdx * 2.5) / 2.5; // 0..1
+
+      if (lockedStage !== 'auto') {
+        stageIdx = parseInt(lockedStage, 10);
+        stageProgress = ((t % 2.5) / 2.5);
+      }
+
+      if (stageIdx !== lastBeepStage) {
+        lastBeepStage = stageIdx;
+        triggerStageSound(stageIdx);
+      }
+
+      const acc = currentMode.accent;
+      const accRgb = currentMode.accentRgb;
+      const b = subjectData.bounds;
+
+      // Base background
+      ctx.clearRect(0, 0, W, H);
+
+      // STAGE 0: ACQUIRE
+      if (stageIdx === 0) {
+        ctx.drawImage(subjectData.desatCanvas, 0, 0);
+        // Subtle mode tint overlay
+        ctx.fillStyle = rgba(accRgb, 0.06);
+        ctx.fillRect(0, 0, W, H);
+
+        // Animated search reticle locking onto center
+        const lockP = Math.min(1, stageProgress * 1.45);
+        const ease = 1 - Math.pow(1 - lockP, 3);
+        const rx = b.cx + (1 - ease) * 55 * Math.cos(t * 5);
+        const ry = b.cy + (1 - ease) * 35 * Math.sin(t * 4);
+        const rw = (b.maxX - b.minX) * (1.28 - 0.22 * ease);
+        const rh = (b.maxY - b.minY) * (1.24 - 0.18 * ease);
+
+        drawCornerBox(rx - rw / 2, ry - rh / 2, rw, rh, acc, 18, 2);
+
+        // Center crosshair
+        ctx.strokeStyle = rgba(accRgb, 0.85);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(rx - 14, ry); ctx.lineTo(rx + 14, ry);
+        ctx.moveTo(rx, ry - 14); ctx.lineTo(rx, ry + 14);
+        ctx.stroke();
+
+        // Right panel: SEARCHING...
+        drawPanel(700, 140, 260, 110, accRgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText(lockP < 0.85 ? 'SEARCHING...' : 'LOCK ACQUIRED', 718, 172);
+        ctx.fillStyle = '#9AB0AC';
+        ctx.font = '12px monospace';
+        ctx.fillText('TRACK', 718, 204);
+        ctx.fillText('LOCK', 718, 228);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(currentMode.unitCode, 785, 204);
+        ctx.fillText(`${(71 + ease * 27.4).toFixed(1)}%`, 785, 228);
+
+        ctx.fillStyle = acc;
+        ctx.font = '12px monospace';
+        ctx.fillText('ROI / 01', 698, 602);
+        ctx.fillStyle = '#8AA6A1';
+        ctx.fillText('STABLE OPTICAL TRACK', 698, 622);
+      }
+
+      // STAGE 1: SILHOUETTE
+      else if (stageIdx === 1) {
+        ctx.drawImage(subjectData.desatCanvas, 0, 0);
+        const dimAlpha = Math.min(0.88, stageProgress * 1.3);
+        drawGridBackground(dimAlpha);
+
+        // Scanline sweep Y position
+        const scanY = b.minY + (b.maxY - b.minY) * Math.min(1, stageProgress * 1.15);
+
+        // Above scanY: glowing flat silhouette; below scanY: desaturated original subject
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, scanY, W, H - scanY);
+        ctx.clip();
+        ctx.drawImage(subjectData.desatCanvas, 0, 0);
+        ctx.restore();
+
+        // Draw flat silhouette for region above scanY
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, W, scanY);
+        ctx.clip();
+        ctx.drawImage(subjectData.fgColorCanvas, 0, 0);
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = rgba(accRgb, 0.25);
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+
+        // Glowing outline on silhouette
+        ctx.fillStyle = rgba(accRgb, 0.85);
+        for (const [ex, ey] of subjectData.edgePoints) {
+          if (ey <= scanY) {
+            ctx.fillRect(ex, ey, 2, 2);
+          }
+        }
+
+        // Horizontal laser scan line
+        if (stageProgress < 0.92) {
+          ctx.strokeStyle = acc;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(b.minX - 35, scanY);
+          ctx.lineTo(b.maxX + 35, scanY);
+          ctx.stroke();
+        }
+
+        // Detection boxes (Crown, Body, Base)
+        const hSpan = b.maxY - b.minY;
+        const boxes = [
+          { y: b.minY, h: hSpan * 0.43, label: currentMode.boxLabels[0] },
+          { y: b.minY + hSpan * 0.44, h: hSpan * 0.42, label: currentMode.boxLabels[1] },
+          { y: b.minY + hSpan * 0.86, h: hSpan * 0.14, label: currentMode.boxLabels[2] }
+        ];
+        boxes.forEach((bx, idx) => {
+          if (stageProgress > idx * 0.18) {
+            drawCornerBox(b.minX - 8, bx.y, (b.maxX - b.minX) + 16, bx.h, rgba(accRgb, 0.75), 10, 1.4);
+            ctx.strokeStyle = rgba(accRgb, 0.45);
+            ctx.beginPath();
+            ctx.moveTo(b.maxX + 12, bx.y + 14);
+            ctx.lineTo(705, bx.y + 14);
+            ctx.stroke();
+            ctx.fillStyle = '#EEF7F5';
+            ctx.font = '12px monospace';
+            ctx.fillText(bx.label, 714, bx.y + 18);
+          }
+        });
+
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('MASK / ACTIVE', 714, 440);
+        ctx.fillStyle = '#8AA6A1';
+        ctx.font = '11px monospace';
+        ctx.fillText('3 REGIONS', 714, 462);
+        ctx.fillText('BOUNDARY PRESERVED', 714, 480);
+      }
+
+      // STAGE 2: STRUCTURE (Wireframe + Skeleton + Angles)
+      else if (stageIdx === 2) {
+        drawGridBackground(0.96);
+
+        // Subtle silhouette fill
+        ctx.save();
+        ctx.drawImage(subjectData.fgColorCanvas, 0, 0);
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = rgba(accRgb, 0.14);
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+
+        // Triangle mesh wireframe
+        ctx.strokeStyle = rgba(accRgb, stageProgress < 0.5 ? 0.55 : 0.28);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const edgeLimit = Math.floor(subjectData.meshEdges.length * Math.min(1, stageProgress * 1.8));
+        for (let i = 0; i < edgeLimit; i++) {
+          const [x1, y1, x2, y2] = subjectData.meshEdges[i];
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+        }
+        ctx.stroke();
+
+        // Glowing boundary points
+        ctx.fillStyle = acc;
+        for (const [ex, ey] of subjectData.edgePoints) {
+          ctx.fillRect(ex, ey, 2, 2);
+        }
+
+        // Structural pose skeleton & measured joint angles in second half of stage
+        if (stageProgress > 0.32) {
+          const lm = subjectData.landmarks;
+          const skelLines = [
+            [lm.apex, lm.neck],
+            [lm.crownLeft, lm.neck],
+            [lm.crownRight, lm.neck],
+            [lm.neck, lm.base],
+            [lm.neck, lm.leftHip],
+            [lm.neck, lm.rightHip],
+            [lm.leftHip, lm.base],
+            [lm.rightHip, lm.base]
+          ];
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          for (const [p1, p2] of skelLines) {
+            ctx.moveTo(p1[0], p1[1]);
+            ctx.lineTo(p2[0], p2[1]);
+          }
+          ctx.stroke();
+
+          // Draw joints
+          for (const key of Object.keys(lm)) {
+            const [jx, jy] = lm[key];
+            ctx.fillStyle = '#07100E';
+            ctx.strokeStyle = acc;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(jx, jy, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+
+          // Joint angle labels
+          ctx.fillStyle = '#EEF7F5';
+          ctx.font = '13px monospace';
+          ctx.fillText('22.8°', lm.crownLeft[0] - 85, lm.crownLeft[1] + 55);
+          ctx.fillText('129.0°', lm.leftHip[0] - 115, lm.leftHip[1] - 35);
+          ctx.fillText('132.3°', lm.rightHip[0] + 55, lm.rightHip[1] - 20);
+        }
+
+        drawPanel(705, 165, 255, 128, accRgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText('GEOMETRY PASS', 722, 195);
+        ctx.fillStyle = '#EEF7F5';
+        ctx.font = '11.5px monospace';
+        ctx.fillText('SOURCE EDGE MAP', 722, 224);
+        ctx.fillStyle = '#8AA6A1';
+        ctx.fillText('TRIANGLE MESH', 722, 246);
+        ctx.fillText('STRUCTURAL LANDMARKS', 722, 268);
+
+        ctx.fillStyle = acc;
+        ctx.font = '12px monospace';
+        ctx.fillText('07 LANDMARKS', 718, 495);
+        ctx.fillStyle = '#8AA6A1';
+        ctx.fillText('AXIS / BRANCH / BASE', 718, 516);
+      }
+
+      // STAGE 3: FEATURES (Real color returns + ENHANCE zoom + 5 typed callouts)
+      else if (stageIdx === 3) {
+        ctx.drawImage(subjectData.colorCanvas, 0, 0);
+
+        // ENHANCE zoom box in top right
+        const zoomFactor = (2.1 + Math.min(0.8, stageProgress * 1.1)).toFixed(1);
+        drawPanel(700, 126, 264, 192, accRgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 12.5px monospace';
+        ctx.fillText(`ENHANCE / ${zoomFactor}x`, 714, 150);
+
+        // Magnified pixel crop from original image rind
+        const cropW = Math.floor(110 / ( zoomFactor / 2.2 ));
+        const cropH = Math.floor(66 / ( zoomFactor / 2.2 ));
+        const sx = b.cx - cropW / 2;
+        const sy = b.minY + (b.maxY - b.minY) * 0.56 - cropH / 2;
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(subjectData.colorCanvas, sx, sy, cropW, cropH, 712, 162, 240, 144);
+        ctx.restore();
+        ctx.strokeStyle = rgba(accRgb, 0.65);
+        ctx.strokeRect(712, 162, 240, 144);
+
+        // Small crop target box on pineapple
+        drawCornerBox(sx, sy, cropW, cropH, acc, 6, 1.2);
+
+        // 5 animated feature callouts with typewriter effect
+        currentMode.features.forEach((ft, i) => {
+          const appearT = (stageProgress - i * 0.14) * 3.2;
+          if (appearT <= 0) return;
+          const fx = W * ft.rx;
+          const fy = H * ft.ry;
+          const labelX = i === 4 ? 345 : 730;
+          const labelY = i === 4 ? 645 : 372 + i * 70;
+
+          ctx.strokeStyle = rgba(accRgb, 0.75);
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(fx, fy);
+          ctx.lineTo(labelX - 10, labelY - 4);
+          ctx.stroke();
+
+          ctx.fillStyle = acc;
+          ctx.beginPath();
+          ctx.arc(fx, fy, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          const chars = Math.floor(Math.min(1, appearT) * ft.title.length);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(ft.title.slice(0, chars), labelX, labelY);
+
+          if (appearT > 0.45) {
+            ctx.fillStyle = '#8AA6A1';
+            ctx.font = '11px monospace';
+            ctx.fillText(ft.sub, labelX, labelY + 18);
+          }
+        });
+      }
+
+      // STAGE 4: PALETTE (6 dominant k-means colors flying into right panel)
+      else if (stageIdx === 4) {
+        ctx.drawImage(subjectData.colorCanvas, 0, 0);
+
+        drawPanel(700, 132, 265, 458, accRgb);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('COLOR SIGNATURE', 718, 164);
+        ctx.fillStyle = '#8AA6A1';
+        ctx.font = '11.5px monospace';
+        ctx.fillText('K-MEANS / 6 CLUSTERS', 718, 186);
+
+        subjectData.palette.forEach((sw, i) => {
+          const flyP = Math.max(0, Math.min(1, (stageProgress - i * 0.09) * 2.2));
+          const ease = 1 - Math.pow(1 - flyP, 3);
+          const targetX = 720;
+          const targetY = 216 + i * 54;
+          const curX = sw.origin[0] + (targetX - sw.origin[0]) * ease;
+          const curY = sw.origin[1] + (targetY - sw.origin[1]) * ease;
+
+          // Swatch square
+          ctx.fillStyle = sw.hex;
+          ctx.fillRect(curX, curY, 28, 28);
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(curX + 0.5, curY + 0.5, 27, 27);
+
+          if (flyP > 0.65) {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 13px monospace';
+            ctx.fillText(sw.hex, targetX + 44, targetY + 13);
+            ctx.fillStyle = '#8AA6A1';
+            ctx.font = '11px monospace';
+            ctx.fillText(sw.pct, targetX + 44, targetY + 28);
+          }
+        });
+
+        ctx.fillStyle = acc;
+        ctx.font = '11px monospace';
+        ctx.fillText('MASKED PIXELS / 100.0%', 718, 568);
+      }
+
+      // STAGE 5: IDENTIFY (Target Locked + ID card + seamless glitch reset at end)
+      else if (stageIdx === 5) {
+        const isGlitch = lockedStage === 'auto' && stageProgress > 0.84;
+
+        if (isGlitch && stageProgress > 0.93) {
+          ctx.drawImage(subjectData.desatCanvas, 0, 0);
+        } else {
+          ctx.drawImage(subjectData.colorCanvas, 0, 0);
+        }
+
+        // Framing corners around whole subject
+        drawCornerBox(b.minX - 14, b.minY - 10, (b.maxX - b.minX) + 28, (b.maxY - b.minY) + 20, acc, 22, 2);
+
+        // TARGET LOCKED ID Card
+        const idc = currentMode.idCard;
+        drawPanel(690, 148, 276, 336, accRgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText( isGlitch ? '_~#LOCK^% [ 9%#?' : idc.header, 710, 184);
+
+        ctx.strokeStyle = rgba(accRgb, 0.35);
+        ctx.beginPath();
+        ctx.moveTo(710, 200);
+        ctx.lineTo(946, 200);
+        ctx.stroke();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText(`SUBJECT / ${idc.subject}`, 710, 232);
+
+        const rows = [
+          ['CLASS', idc.classVal],
+          [idc.speciesTitle, idc.speciesVal],
+          [idc.threatTitle, idc.threatVal],
+          ['MATCH', idc.matchVal]
+        ];
+        rows.forEach(([k, v], idx) => {
+          const ry = 274 + idx * 38;
+          ctx.fillStyle = '#8AA6A1';
+          ctx.font = '12px monospace';
+          ctx.fillText(k, 710, ry);
+          ctx.fillStyle = idx >= 2 ? acc : '#FFFFFF';
+          ctx.font = 'bold 13.5px monospace';
+          ctx.fillText(v, 795, ry);
+        });
+
+        ctx.fillStyle = '#8AA6A1';
+        ctx.font = '11.5px monospace';
+        ctx.fillText('ANALYSIS / COMPLETE', 710, 456);
+        ctx.fillText('SIMULATED CLASSIFICATION', 694, 520);
+        ctx.fillText('REPLAY BUFFER / READY', 694, 540);
+
+        // Glitch slice displacement effect right before seamless reset
+        if (isGlitch) {
+          for (let s = 0; s < 9; s++) {
+            const sy = Math.floor(Math.random() * (H - 40));
+            const sh = Math.floor(8 + Math.random() * 28);
+            const dx = Math.floor((Math.random() - 0.5) * 44);
+            ctx.drawImage(canvas, 0, sy, W, sh, dx, sy, W, sh);
+            ctx.fillStyle = s % 2 === 0 ? rgba(accRgb, 0.18) : 'rgba(255, 60, 90, 0.14)';
+            ctx.fillRect(0, sy, W, 3);
+          }
+        }
+      }
+
+      // Draw mode-specific tactical overlay
+      drawModeOverlay(t, stageIdx);
+
+      // Persistent HUD Chrome: Top Header, Left Analysis Pipeline Panel, Bottom Status Bar
+      drawPersistentHUD(t, stageIdx, stageProgress);
+    }
+
+    function drawPersistentHUD(t, stageIdx, stageProgress) {
+      const acc = currentMode.accent;
+      const accRgb = currentMode.accentRgb;
+
+      // Top bar backdrop
+      ctx.fillStyle = 'rgba(7, 11, 10, 0.78)';
+      ctx.fillRect(0, 0, W, 82);
+      ctx.strokeStyle = rgba(accRgb, 0.35);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(24, 82);
+      ctx.lineTo(W - 24, 82);
+      ctx.stroke();
+
+      // REC indicator
+      if (Math.floor(t * 2) % 2 === 0) {
+        ctx.fillStyle = '#FF4D4D';
+        ctx.beginPath();
+        ctx.arc(36, 34, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('REC', 50, 39);
+      ctx.fillStyle = '#D5E5E2';
+      ctx.font = '14px monospace';
+      ctx.fillText(currentMode.name, 98, 39);
+
+      ctx.fillStyle = '#8AA6A1';
+      ctx.font = '11.5px monospace';
+      ctx.fillText(currentMode.sub, 30, 64);
+
+      // Running Timecode (15 fps frame counter)
+      const sec = Math.floor(t);
+      const frame = Math.floor((t - sec) * 15);
+      const tc = `00:00:${String(sec).padStart(2, '0')}:${String(frame).padStart(2, '0')}`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(tc, 795, 39);
+      ctx.fillStyle = '#8AA6A1';
+      ctx.font = '11.5px monospace';
+      ctx.fillText('15 FPS / LIVE', 812, 64);
+
+      // Left Stage Progress Panel (in the emptiest left area)
+      drawPanel(28, 135, 272, 338, accRgb);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('ANALYSIS PIPELINE', 46, 168);
+      ctx.fillStyle = '#8AA6A1';
+      ctx.font = '11.5px monospace';
+      ctx.fillText(`SEQ 006  /  UNIT ${currentMode.unitCode}`, 46, 190);
+
+      currentMode.stages.forEach((stName, i) => {
+        const ry = 212 + i * 38;
+        if (i === stageIdx) {
+          ctx.fillStyle = rgba(accRgb, 0.14);
+          ctx.fillRect(38, ry - 18, 252, 28);
+          ctx.strokeStyle = rgba(accRgb, 0.65);
+          ctx.strokeRect(38.5, ry - 17.5, 251, 27);
+        }
+
+        ctx.fillStyle = i <= stageIdx ? '#FFFFFF' : '#7B9490';
+        ctx.font = i === stageIdx ? 'bold 13px monospace' : '13px monospace';
+        ctx.fillText(`0${i + 1}`, 48, ry);
+        ctx.fillText(stName, 84, ry);
+
+        if (i < stageIdx) {
+          ctx.fillStyle = acc;
+          ctx.font = 'bold 13px monospace';
+          ctx.fillText('✓', 266, ry);
+        } else if (i === stageIdx) {
+          ctx.fillStyle = acc;
+          ctx.fillRect(266, ry - 9, 8, 8);
+        }
+      });
+
+      // Overall progress bar inside left panel
+      const totalProg = lockedStage === 'auto' ? (t / DURATION) : ((stageIdx + stageProgress) / 6);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(46, 446, 236, 4);
+      ctx.fillStyle = acc;
+      ctx.fillRect(46, 446, 236 * Math.min(1, totalProg), 4);
+
+      // Lower-left Stage Title & Description
+      ctx.fillStyle = acc;
+      ctx.font = '12.5px monospace';
+      ctx.fillText(`0${stageIdx + 1} / 06`, 30, 524);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillText(currentMode.stages[stageIdx], 30, 560);
+      ctx.fillStyle = '#8AA6A1';
+      ctx.font = '11.5px monospace';
+      ctx.fillText(currentMode.stageDescs[stageIdx][0], 30, 588);
+      ctx.fillText(currentMode.stageDescs[stageIdx][1], 30, 608);
+
+      // Bottom bar
+      ctx.fillStyle = 'rgba(7, 11, 10, 0.82)';
+      ctx.fillRect(0, H - 56, W, 56);
+      ctx.strokeStyle = rgba(accRgb, 0.35);
+      ctx.beginPath();
+      ctx.moveTo(24, H - 56);
+      ctx.lineTo(W - 24, H - 56);
+      ctx.stroke();
+
+      ctx.fillStyle = acc;
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(currentMode.unitCode, 30, H - 22);
+      ctx.fillStyle = '#D5E5E2';
+      ctx.font = '12.5px monospace';
+      ctx.fillText(currentMode.speciesLabel, 122, H - 22);
+      ctx.fillStyle = '#8AA6A1';
+      ctx.fillText(currentMode.footerRight, 615, H - 22);
+
+      // Subtle CRT scanlines across entire frame
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.13)';
+      for (let y = 0; y < H; y += 4) {
+        ctx.fillRect(0, y, W, 1);
+      }
+    }
+
+    // Animation loop
+    function tick(now) {
+      let elapsed;
+      if (isPlaying) {
+        elapsed = ((now - startTime) / 1000) % DURATION;
+        pausedElapsed = elapsed;
+      } else {
+        elapsed = pausedElapsed;
+      }
+      renderFrame(elapsed);
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    // UI Event Listeners: Mode Switcher
+    document.getElementById('modeSwitcher').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-mode]');
+      if (!btn) return;
+      const modeKey = btn.dataset.mode;
+      currentMode = MODES[modeKey];
+
+      document.querySelectorAll('#modeSwitcher .btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Update CSS theme accent dynamically
+      document.documentElement.style.setProperty('--accent', currentMode.accent);
+      document.documentElement.style.setProperty('--border', rgba(currentMode.accentRgb, 0.36));
+      document.getElementById('modeStatusText').textContent = `${currentMode.name} (${modeKey.toUpperCase()})`;
+
+      // Update stage pill labels
+      const stageBtns = document.querySelectorAll('#stagePills .stage-pill[data-stage]');
+      stageBtns.forEach(sb => {
+        const st = sb.dataset.stage;
+        if (st !== 'auto') {
+          const idx = parseInt(st, 10);
+          sb.textContent = `0${idx + 1} ${currentMode.stages[idx]}`;
+        }
+      });
+      triggerStageSound(0);
+    });
+
+    // Stage Selector Pills
+    document.getElementById('stagePills').addEventListener('click', (e) => {
+      const pill = e.target.closest('.stage-pill');
+      if (!pill) return;
+      lockedStage = pill.dataset.stage;
+      document.querySelectorAll('#stagePills .stage-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+
+    // Play / Pause
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    playPauseBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        startTime = performance.now() - pausedElapsed * 1000;
+        playPauseBtn.textContent = '⏸ ПАУЗА';
+      } else {
+        playPauseBtn.textContent = '▶ ПУСК';
+      }
+    });
+
+    // Sound Toggle
+    const soundBtn = document.getElementById('soundBtn');
+    soundBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundBtn.textContent = soundEnabled ? '🔊 ЗВУК: ВКЛ' : '🔇 ЗВУК: ВЫКЛ';
+      if (soundEnabled) triggerStageSound(0);
+    });
+
+    // Custom Image Upload
+    document.getElementById('uploadInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          analyzeImage(img);
+          startTime = performance.now();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Export 15s WebM Video directly from Canvas
+    const recordBtn = document.getElementById('recordBtn');
+    recordBtn.addEventListener('click', () => {
+      if (recordBtn.disabled) return;
+      const stream = canvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `subject-analysis-${currentMode.id}.webm`;
+        a.click();
+        recordBtn.disabled = false;
+        recordBtn.textContent = '⏺ ЭКСПОРТ WEBM';
+      };
+      lockedStage = 'auto';
+      isPlaying = true;
+      startTime = performance.now();
+      recordBtn.disabled = true;
+      recordBtn.textContent = '⏳ ЗАПИСЬ 15 СЕК...';
+      recorder.start();
+      setTimeout(() => recorder.stop(), DURATION * 1000);
+    });
+  </script>
+</body>
+</html>
