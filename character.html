@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CYBERPUNK CHARACTER ANALYSIS // 3D TACTICAL LOADOUT HUD</title>
+  <style>
+    :root {
+      --bg: #05070b;
+      --panel: rgba(8, 13, 21, 0.86);
+      --border: rgba(0, 240, 255, 0.36);
+      --accent: #00F0FF;
+      --accent2: #FF2A85;
+      --accent3: #FCEE09;
+      --text: #EBF9FF;
+      --muted: #7B9BB0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 25%, #0f1b29 0%, #040609 100%);
+      color: var(--text);
+      font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", "Courier New", monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 14px 28px;
+      gap: 10px;
+      user-select: none;
+    }
+
+    .topbar, .controls-bar {
+      width: 100%;
+      max-width: 1160px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 5px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .rec-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent2);
+      box-shadow: 0 0 10px var(--accent2);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.25; }
+    }
+
+    .group-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .group-label {
+      font-size: 10.5px;
+      color: var(--muted);
+      letter-spacing: 0.07em;
+      margin-right: 2px;
+      text-transform: uppercase;
+    }
+
+    .btn {
+      background: rgba(0, 240, 255, 0.04);
+      color: var(--text);
+      border: 1px solid rgba(0, 240, 255, 0.28);
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      background: rgba(0, 240, 255, 0.12);
+    }
+
+    .btn.active {
+      background: var(--accent);
+      color: #03090d;
+      border-color: var(--accent);
+      font-weight: 700;
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+    }
+
+    .btn.pink.active {
+      background: var(--accent2);
+      color: #ffffff;
+      border-color: var(--accent2);
+      box-shadow: 0 0 14px rgba(255, 42, 133, 0.45);
+    }
+
+    .btn.gold.active {
+      background: var(--accent3);
+      color: #090800;
+      border-color: var(--accent3);
+      box-shadow: 0 0 14px rgba(252, 238, 9, 0.45);
+    }
+
+    .viewport-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 1160px;
+      display: flex;
+      justify-content: center;
+      background: #030508;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.75);
+    }
+
+    canvas#mainCanvas {
+      width: 100%;
+      max-width: 1080px;
+      height: auto;
+      aspect-ratio: 1080 / 720;
+      display: block;
+      border-radius: 3px;
+      cursor: grab;
+      background: #05080d;
+    }
+
+    canvas#mainCanvas:active {
+      cursor: grabbing;
+    }
+
+    .footer-bar {
+      width: 100%;
+      max-width: 1160px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      padding: 2px 4px;
+    }
+
+    .hint-highlight {
+      color: var(--accent3);
+      font-weight: 600;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Top Controls: Stage Pipeline & Playback -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="rec-dot"></span>
+      <span>KIROSHI CHARACTER SCANNER // 3D UNIT INSPECTOR</span>
+    </div>
+
+    <div class="group-row" id="stageRow">
+      <button class="btn active" data-stage="auto">AUTO SHOWCASE (18s)</button>
+      <button class="btn" data-stage="0">01 · 360° SCAN</button>
+      <button class="btn" data-stage="1">02 · RIG & HITBOX</button>
+      <button class="btn" data-stage="2">03 · SUIT / SKINS</button>
+      <button class="btn" data-stage="3">04 · ARSENAL</button>
+      <button class="btn" data-stage="4">05 · LVL 1→100</button>
+      <button class="btn" data-stage="5">06 · DOSSIER</button>
+    </div>
+
+    <div class="group-row">
+      <a class="btn" href="index.html" style="text-decoration:none;">← 🍍 2D ОБЪЕКТ</a>
+      <button class="btn" id="soundBtn">🔇 ЗВУК: ВЫКЛ</button>
+      <button class="btn" id="recordBtn">⏺ ЭКСПОРТ WEBM</button>
+    </div>
+  </header>
+
+  <!-- Second Row: Direct Interactive Customization (Skin, Weapon, Level) -->
+  <section class="controls-bar">
+    <div class="group-row" id="skinRow">
+      <span class="group-label">КОСТЮМ (SKIN):</span>
+      <button class="btn active" data-skin="0">STREET MERC</button>
+      <button class="btn pink" data-skin="1">ARASAKA SPEC-OPS</button>
+      <button class="btn gold" data-skin="2">NETRUNNER GOLD</button>
+    </div>
+
+    <div class="group-row" id="weaponRow">
+      <span class="group-label">ОРУЖИЕ (WEAPON):</span>
+      <button class="btn active" data-weapon="0">PLASMA RIFLE</button>
+      <button class="btn pink" data-weapon="1">THERMAL KATANA</button>
+      <button class="btn gold" data-weapon="2">HEAVY RAILGUN</button>
+    </div>
+
+    <div class="group-row" id="levelRow">
+      <span class="group-label">УРОВЕНЬ (TIER):</span>
+      <button class="btn" data-level="1">LVL 01 · ROOKIE</button>
+      <button class="btn active" data-level="50">LVL 50 · VETERAN</button>
+      <button class="btn gold" data-level="100">LVL 100 · CYBER-GOD</button>
+    </div>
+  </section>
+
+  <main class="viewport-wrap">
+    <canvas id="mainCanvas" width="1080" height="720"></canvas>
+  </main>
+
+  <footer class="footer-bar">
+    <div>🖱 <span class="hint-highlight">ВРАЩЕНИЕ МЫШКОЙ 360°</span> (ЗАЖМИТЕ ЛКМ И КРУТИТЕ ПЕРСОНАЖА В ЛЮБОЙ МОМЕНТ) · КОЛЕСИКО — ЗУМ</div>
+    <div>THREE.JS WEBGL 3D + TACTICAL HUD COMPOSITOR · 1080 × 720 · 60 FPS</div>
+  </footer>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const W = 1080;
+    const H = 720;
+    const LOOP_DURATION = 18.0; // 6 stages x 3s
+
+    const mainCanvas = document.getElementById('mainCanvas');
+    const ctx = mainCanvas.getContext('2d');
+
+    // Offscreen WebGL canvas for Three.js 3D scene
+    const glCanvas = document.createElement('canvas');
+    glCanvas.width = W;
+    glCanvas.height = H;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas: glCanvas,
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: true
+    });
+    renderer.setSize(W, H, false);
+    renderer.setPixelRatio(1);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(36, W / H, 0.1, 100);
+    camera.position.set(0, 1.55, 4.5);
+
+    // Attach OrbitControls to the visible canvas so the user can rotate 360 degrees anytime
+    const controls = new OrbitControls(camera, mainCanvas);
+    controls.target.set(0, 1.15, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 2.0;
+    controls.maxDistance = 7.0;
+    controls.maxPolarAngle = Math.PI * 0.52;
+
+    let userInteracting = false;
+    controls.addEventListener('start', () => { userInteracting = true; });
+    controls.addEventListener('end', () => {
+      setTimeout(() => { userInteracting = false; }, 2500);
+    });
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0x88ddff, 0x101020, 1.4);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+    keyLight.position.set(3, 5, 4);
+    scene.add(keyLight);
+
+    const rimLightCyan = new THREE.PointLight(0x00f0ff, 6, 8);
+    rimLightCyan.position.set(-2.5, 2.4, -1.8);
+    scene.add(rimLightCyan);
+
+    const rimLightPink = new THREE.PointLight(0xff2a85, 5, 8);
+    rimLightPink.position.set(2.5, 1.8, -1.8);
+    scene.add(rimLightPink);
+
+    // Skins definition
+    const SKINS = [
+      {
+        name: 'MK-I STREET MERC',
+        code: 'SKIN_01 // NIGHT CITY RUNNER',
+        primary: 0x1b2636,
+        secondary: 0x2c3b4d,
+        glow: 0x00f0ff,
+        glowHex: '#00F0FF',
+        glowRgb: [0, 240, 255],
+        visor: 0x00f0ff,
+        armorBonus: '+18% EVASION',
+        manufacturer: 'MILITECH SURPLUS'
+      },
+      {
+        name: 'ARASAKA SPEC-OPS',
+        code: 'SKIN_02 // COUNTER-INTEL SYNDICATE',
+        primary: 0x161219,
+        secondary: 0x2b1422,
+        glow: 0xff2a85,
+        glowHex: '#FF2A85',
+        glowRgb: [255, 42, 133],
+        visor: 0xff2a85,
+        armorBonus: '+35% CRIT DAMAGE',
+        manufacturer: 'ARASAKA CORP'
+      },
+      {
+        name: 'NETRUNNER GOLD',
+        code: 'SKIN_03 // CELESTIAL OVERCLOCK',
+        primary: 0x211e14,
+        secondary: 0x453915,
+        glow: 0xfcee09,
+        glowHex: '#FCEE09',
+        glowRgb: [252, 238, 9],
+        visor: 0xfcee09,
+        armorBonus: '+50% RAM RECOVERY',
+        manufacturer: 'KANG TAO ELITE'
+      }
+    ];
+
+    // Weapons definition
+    const WEAPONS = [
+      {
+        name: 'M-179E ACHILLES PLASMA RIFLE',
+        type: 'TECH ASSAULT RIFLE',
+        dmg: '840 DPS',
+        rpm: '680 RPM',
+        range: '85 M',
+        ammo: 'HV-PLASMA CELL',
+        perk: 'RICOCHET + SHIELD PIERCE',
+        parts: ['OPTIC SCOPE 2.4X', 'PLASMA COIL BARREL', 'OVERCHARGE CAPACITOR']
+      },
+      {
+        name: 'ERRATA THERMAL KATANA',
+        type: 'MONOMOLECULAR MELEE BLADE',
+        dmg: '1,290 DPS',
+        rpm: '3.4 SWINGS/S',
+        range: '2.8 M',
+        ammo: 'THERMAL EDGE (1800°C)',
+        perk: '100% BURN + ARMOR SLICE',
+        parts: ['MONO-CRYSTAL EDGE', 'PIEZO HILT GYRO', 'THERMAL INDUCTION SPINE']
+      },
+      {
+        name: 'NEKOMATA EM-RAILGUN',
+        type: 'HEAVY ANTI-MATERIEL CANNON',
+        dmg: '2,450 DPS',
+        rpm: '95 RPM',
+        range: '320 M',
+        ammo: 'TUNGSTEN SLUG 14MM',
+        perk: 'PENETRATES WALLS & MECHS',
+        parts: ['DUAL MAGNETIC RAILS', 'BIPOD STABILIZER', 'TOROIDAL CAPACITOR BANK']
+      }
+    ];
+
+    // Levels definition
+    const LEVELS = {
+      1: {
+        lvl: 1,
+        tier: 'TIER I · ROOKIE OPERATIVE',
+        hp: 1200,
+        atk: 340,
+        def: 210,
+        spd: 480,
+        crit: '14%',
+        powerScore: '1,840',
+        statsNorm: [0.32, 0.28, 0.25, 0.45, 0.30] // HP, ATK, DEF, SPD, TECH
+      },
+      50: {
+        lvl: 50,
+        tier: 'TIER II · CHROME VETERAN',
+        hp: 4850,
+        atk: 1420,
+        def: 980,
+        spd: 760,
+        crit: '42%',
+        powerScore: '14,900',
+        statsNorm: [0.68, 0.65, 0.62, 0.72, 0.70]
+      },
+      100: {
+        lvl: 100,
+        tier: 'TIER III · APEX CYBER-GOD',
+        hp: 9999,
+        atk: 3890,
+        def: 2650,
+        spd: 990,
+        crit: '88%',
+        powerScore: '58,400',
+        statsNorm: [0.98, 0.96, 0.92, 0.95, 1.00]
+      }
+    };
+
+    // Build Procedural 3D Cyberpunk Character Rig
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    // Holographic Turntable Pedestal
+    const pedestalGroup = new THREE.Group();
+    rootGroup.add(pedestalGroup);
+
+    const baseGeo = new THREE.CylinderGeometry(1.15, 1.28, 0.08, 48);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x0c141d, metalness: 0.85, roughness: 0.25 });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.position.y = -0.04;
+    pedestalGroup.add(baseMesh);
+
+    const ringGeo1 = new THREE.RingGeometry(0.95, 1.02, 64);
+    ringGeo1.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide });
+    const ringMesh1 = new THREE.Mesh(ringGeo1, ringMat);
+    ringMesh1.position.y = 0.01;
+    pedestalGroup.add(ringMesh1);
+
+    const ringGeo2 = new THREE.RingGeometry(1.10, 1.13, 32);
+    ringGeo2.rotateX(-Math.PI / 2);
+    const ringMesh2 = new THREE.Mesh(ringGeo2, ringMat);
+    ringMesh2.position.y = 0.012;
+    pedestalGroup.add(ringMesh2);
+
+    // Character Materials (dynamically updated on skin/stage change)
+    const armorPrimaryMat = new THREE.MeshStandardMaterial({
+      color: SKINS[0].primary,
+      metalness: 0.78,
+      roughness: 0.26
+    });
+    const armorSecondaryMat = new THREE.MeshStandardMaterial({
+      color: SKINS[0].secondary,
+      metalness: 0.65,
+      roughness: 0.35
+    });
+    const neonMat = new THREE.MeshStandardMaterial({
+      color: SKINS[0].glow,
+      emissive: SKINS[0].glow,
+      emissiveIntensity: 2.2,
+      roughness: 0.1
+    });
+    const jointMat = new THREE.MeshStandardMaterial({
+      color: 0x11161d,
+      metalness: 0.9,
+      roughness: 0.4
+    });
+
+    const charGroup = new THREE.Group();
+    rootGroup.add(charGroup);
+
+    function addPart(parent, geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.rotation.set(rx, ry, rz);
+      parent.add(m);
+      return m;
+    }
+
+    // Legs & Boots
+    [-0.21, 0.21].forEach((lx) => {
+      // Shin armor
+      addPart(charGroup, new THREE.CylinderGeometry(0.095, 0.075, 0.48, 12), armorPrimaryMat, lx, 0.34, 0);
+      // Knee neon pad
+      addPart(charGroup, new THREE.BoxGeometry(0.12, 0.09, 0.14), neonMat, lx, 0.58, 0.03);
+      // Thigh armor
+      addPart(charGroup, new THREE.CylinderGeometry(0.125, 0.095, 0.44, 12), armorSecondaryMat, lx, 0.80, 0);
+      // Cyber Boot
+      addPart(charGroup, new THREE.BoxGeometry(0.15, 0.11, 0.28), armorPrimaryMat, lx, 0.055, 0.04);
+      addPart(charGroup, new THREE.BoxGeometry(0.155, 0.025, 0.29), neonMat, lx, 0.015, 0.04);
+    });
+
+    // Pelvis / Belt
+    addPart(charGroup, new THREE.BoxGeometry(0.52, 0.16, 0.28), armorSecondaryMat, 0, 1.04, 0);
+    addPart(charGroup, new THREE.BoxGeometry(0.16, 0.12, 0.30), neonMat, 0, 1.04, 0);
+
+    // Torso / Chestplate
+    const torsoGroup = new THREE.Group();
+    torsoGroup.position.set(0, 1.38, 0);
+    charGroup.add(torsoGroup);
+
+    addPart(torsoGroup, new THREE.CylinderGeometry(0.31, 0.23, 0.52, 8), armorPrimaryMat, 0, 0, 0);
+    // Chest Reactor / Cyber Core
+    addPart(torsoGroup, new THREE.CylinderGeometry(0.09, 0.09, 0.04, 16), neonMat, 0, 0.06, 0.26, Math.PI / 2, 0, 0);
+    // Collar / Neck Guard
+    addPart(torsoGroup, new THREE.TorusGeometry(0.16, 0.045, 10, 24), armorSecondaryMat, 0, 0.27, 0, Math.PI / 2, 0, 0);
+    // Spine neon strips
+    for (let s = -1; s <= 1; s++) {
+      addPart(torsoGroup, new THREE.BoxGeometry(0.06, 0.06, 0.04), neonMat, 0, s * 0.12, -0.25);
+    }
+
+    // Head & Cyber Helmet
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.82, 0);
+    charGroup.add(headGroup);
+
+    addPart(headGroup, new THREE.BoxGeometry(0.26, 0.30, 0.29), armorPrimaryMat, 0, 0, 0);
+    // Glowing Cyberpunk Visor
+    addPart(headGroup, new THREE.BoxGeometry(0.275, 0.085, 0.22), neonMat, 0, 0.02, 0.06);
+    // Helmet crest
+    addPart(headGroup, new THREE.BoxGeometry(0.06, 0.10, 0.31), armorSecondaryMat, 0, 0.16, 0);
+
+    // Left Arm
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.38, 1.56, 0);
+    charGroup.add(leftArmGroup);
+    addPart(leftArmGroup, new THREE.SphereGeometry(0.11, 12, 12), jointMat, 0, 0, 0);
+    addPart(leftArmGroup, new THREE.CylinderGeometry(0.085, 0.075, 0.34, 10), armorSecondaryMat, -0.04, -0.18, 0, 0, 0, 0.12);
+    addPart(leftArmGroup, new THREE.CylinderGeometry(0.075, 0.065, 0.32, 10), armorPrimaryMat, -0.08, -0.46, 0.06, -0.35, 0, 0);
+
+    // Right Arm (Weapon Arm)
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.38, 1.56, 0);
+    charGroup.add(rightArmGroup);
+    addPart(rightArmGroup, new THREE.SphereGeometry(0.11, 12, 12), jointMat, 0, 0, 0);
+    addPart(rightArmGroup, new THREE.CylinderGeometry(0.085, 0.075, 0.34, 10), armorSecondaryMat, 0.04, -0.16, 0.04, -0.25, 0, -0.12);
+    addPart(rightArmGroup, new THREE.CylinderGeometry(0.08, 0.07, 0.34, 10), armorPrimaryMat, 0.08, -0.38, 0.22, -0.85, 0, 0);
+
+    //Weapon Anchor at Right Hand
+    const weaponAnchor = new THREE.Group();
+    weaponAnchor.position.set(0.09, -0.48, 0.38);
+    rightArmGroup.add(weaponAnchor);
+
+    // Build 3 Distinct 3D Weapon Meshes
+    const weaponMeshes = [];
+
+    // Weapon 0: Plasma Assault Rifle
+    const rifleGroup = new THREE.Group();
+    addPart(rifleGroup, new THREE.BoxGeometry(0.08, 0.16, 0.78), armorPrimaryMat, 0, 0, 0.18);
+    addPart(rifleGroup, new THREE.CylinderGeometry(0.025, 0.025, 0.45, 12), neonMat, 0, 0.03, 0.56, Math.PI / 2, 0, 0);
+    addPart(rifleGroup, new THREE.BoxGeometry(0.06, 0.07, 0.24), neonMat, 0, 0.11, 0.15); // Optic scope
+    addPart(rifleGroup, new THREE.BoxGeometry(0.065, 0.20, 0.11), armorSecondaryMat, 0, -0.14, 0.22, 0.25, 0, 0); // Mag
+    weaponAnchor.add(rifleGroup);
+    weaponMeshes.push(rifleGroup);
+
+    // Weapon 1: Thermal Katana
+    const katanaGroup = new THREE.Group();
+    addPart(katanaGroup, new THREE.CylinderGeometry(0.025, 0.022, 0.28, 10), armorSecondaryMat, 0, 0, -0.02, Math.PI / 2, 0, 0);
+    addPart(katanaGroup, new THREE.BoxGeometry(0.09, 0.09, 0.02), armorPrimaryMat, 0, 0, 0.12); // Guard
+    addPart(katanaGroup, new THREE.BoxGeometry(0.016, 0.045, 0.98), neonMat, 0, 0.01, 0.62); // Glowing thermal blade
+    katanaGroup.visible = false;
+    weaponAnchor.add(katanaGroup);
+    weaponMeshes.push(katanaGroup);
+
+    // Weapon 2: Heavy EM-Railgun
+    const railgunGroup = new THREE.Group();
+    addPart(railgunGroup, new THREE.BoxGeometry(0.14, 0.22, 0.95), armorSecondaryMat, 0, 0.02, 0.25);
+    addPart(railgunGroup, new THREE.BoxGeometry(0.035, 0.045, 1.15), neonMat, -0.045, 0.06, 0.58); // Left rail
+    addPart(railgunGroup, new THREE.BoxGeometry(0.035, 0.045, 1.15), neonMat, 0.045, 0.06, 0.58);  // Right rail
+    addPart(railgunGroup, new THREE.CylinderGeometry(0.06, 0.06, 0.30, 12), neonMat, 0, -0.08, 0.18, Math.PI / 2, 0, 0);
+    railgunGroup.visible = false;
+    weaponAnchor.add(railgunGroup);
+    weaponMeshes.push(railgunGroup);
+
+    // Level Upgrade Attachments (Tier II: Level 50 Shoulder Pauldrons & Drone; Tier III: Level 100 Cyber Wings & Halo)
+    const lvl50Group = new THREE.Group();
+    charGroup.add(lvl50Group);
+    // Heavy Shoulder Pauldrons
+    addPart(lvl50Group, new THREE.BoxGeometry(0.24, 0.16, 0.32), armorPrimaryMat, -0.44, 1.65, 0, 0, 0, 0.28);
+    addPart(lvl50Group, new THREE.BoxGeometry(0.25, 0.04, 0.33), neonMat, -0.44, 1.72, 0, 0, 0, 0.28);
+    addPart(lvl50Group, new THREE.BoxGeometry(0.24, 0.16, 0.32), armorPrimaryMat, 0.44, 1.65, 0, 0, 0, -0.28);
+    addPart(lvl50Group, new THREE.BoxGeometry(0.25, 0.04, 0.33), neonMat, 0.44, 1.72, 0, 0, 0, -0.28);
+    // Tactical Antenna on helmet
+    addPart(lvl50Group, new THREE.CylinderGeometry(0.01, 0.01, 0.32, 8), neonMat, -0.14, 1.98, -0.05);
+
+    const lvl100Group = new THREE.Group();
+    charGroup.add(lvl100Group);
+    // Cybernetic Valiance Energy Wings
+    [-1, 1].forEach((dir) => {
+      for (let b = 0; b < 3; b++) {
+        const wingBlade = addPart(
+          lvl100Group,
+          new THREE.BoxGeometry(0.62 - b * 0.12, 0.055, 0.025),
+          neonMat,
+          dir * (0.48 + b * 0.08),
+          1.62 - b * 0.16,
+          -0.22,
+          0,
+          dir * -0.25,
+          dir * (0.35 - b * 0.18)
+        );
+      }
+    });
+    // Floating Cyber Halo Crown & Orbital Drone
+    const haloMesh = addPart(lvl100Group, new THREE.TorusGeometry(0.24, 0.018, 12, 36), neonMat, 0, 2.12, 0, Math.PI / 2, 0, 0);
+    const droneOrb = addPart(lvl100Group, new THREE.OctahedronGeometry(0.11, 0), neonMat, -0.75, 1.85, 0.25);
+
+    // Internal 3D Rig Skeleton Nodes (projected onto 2D HUD for Hitboxes & Rig stage)
+    const rigJoints3D = {
+      head: new THREE.Vector3(0, 1.84, 0),
+      neck: new THREE.Vector3(0, 1.64, 0),
+      shoulderL: new THREE.Vector3(-0.38, 1.56, 0),
+      shoulderR: new THREE.Vector3(0.38, 1.56, 0),
+      elbowL: new THREE.Vector3(-0.44, 1.28, 0.04),
+      elbowR: new THREE.Vector3(0.44, 1.28, 0.18),
+      weaponTip: new THREE.Vector3(0.47, 1.12, 0.92),
+      core: new THREE.Vector3(0, 1.35, 0),
+      pelvis: new THREE.Vector3(0, 1.04, 0),
+      kneeL: new THREE.Vector3(-0.21, 0.58, 0),
+      kneeR: new THREE.Vector3(0.21, 0.58, 0),
+      footL: new THREE.Vector3(-0.21, 0.06, 0.05),
+      footR: new THREE.Vector3(0.21, 0.06, 0.05)
+    };
+
+    // State
+    let currentSkinIdx = 0;
+    let currentWeaponIdx = 0;
+    let currentLevel = 50;
+    let stageMode = 'auto';
+    let startTime = performance.now();
+    let soundEnabled = false;
+    let audioCtx = null;
+    let lastStageSound = -1;
+
+    function playStageBeep(freq = 640) {
+      if (!soundEnabled) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.35, now + 0.08);
+      gain.gain.setValueAtTime(0.05, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.10);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.11);
+    }
+
+    function applySkin(idx) {
+      currentSkinIdx = idx;
+      const s = SKINS[idx];
+      armorPrimaryMat.color.setHex(s.primary);
+      armorSecondaryMat.color.setHex(s.secondary);
+      neonMat.color.setHex(s.glow);
+      neonMat.emissive.setHex(s.glow);
+      ringMat.color.setHex(s.glow);
+      rimLightCyan.color.setHex(s.glow);
+
+      document.querySelectorAll('#skinRow .btn').forEach((b, i) => {
+        b.classList.toggle('active', i === idx);
+      });
+    }
+
+    function applyWeapon(idx) {
+      currentWeaponIdx = idx;
+      weaponMeshes.forEach((m, i) => { m.visible = (i === idx); });
+      document.querySelectorAll('#weaponRow .btn').forEach((b, i) => {
+        b.classList.toggle('active', i === idx);
+      });
+    }
+
+    function applyLevel(lvl) {
+      currentLevel = lvl;
+      lvl50Group.visible = (lvl >= 50);
+      lvl100Group.visible = (lvl >= 100);
+      document.querySelectorAll('#levelRow .btn').forEach((b) => {
+        b.classList.toggle('active', parseInt(b.dataset.level, 10) === lvl);
+      });
+    }
+
+    applySkin(0);
+    applyWeapon(0);
+    applyLevel(50);
+
+    // Project 3D world point to 2D canvas coordinates
+    function project3D(localVec) {
+      const worldVec = localVec.clone().applyMatrix4(charGroup.matrixWorld);
+      worldVec.project(camera);
+      return [
+        (worldVec.x * 0.5 + 0.5) * W,
+        (-worldVec.y * 0.5 + 0.5) * H
+      ];
+    }
+
+    function rgba(rgb, a) {
+      return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+    }
+
+    function drawCornerBox(x, y, w, h, color, len = 12, lw = 1.6) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(x, y + len); ctx.lineTo(x, y); ctx.lineTo(x + len, y);
+      ctx.moveTo(x + w - len, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + len);
+      ctx.moveTo(x + w, y + h - len); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - len, y + h);
+      ctx.moveTo(x + len, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - len);
+      ctx.stroke();
+    }
+
+    function drawPanel(x, y, w, h, rgb) {
+      ctx.fillStyle = 'rgba(6, 11, 18, 0.84)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = rgba(rgb, 0.42);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+
+    function drawRadarChart(cx, cy, radius, values, labels, rgb) {
+      const n = values.length;
+      ctx.save();
+      // Concentric pentagons
+      for (let r = 0.33; r <= 1.01; r += 0.33) {
+        ctx.strokeStyle = rgba(rgb, 0.22);
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const ang = -Math.PI / 2 + (i * Math.PI * 2) / n;
+          const px = cx + Math.cos(ang) * radius * r;
+          const py = cy + Math.sin(ang) * radius * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+      // Stat polygon
+      ctx.fillStyle = rgba(rgb, 0.28);
+      ctx.strokeStyle = rgba(rgb, 0.95);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const ang = -Math.PI / 2 + (i * Math.PI * 2) / n;
+        const px = cx + Math.cos(ang) * radius * values[i];
+        const py = cy + Math.sin(ang) * radius * values[i];
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Axis labels
+      ctx.fillStyle = '#EBF9FF';
+      ctx.font = 'bold 10.5px monospace';
+      for (let i = 0; i < n; i++) {
+        const ang = -Math.PI / 2 + (i * Math.PI * 2) / n;
+        const lx = cx + Math.cos(ang) * (radius + 22) - 14;
+        const ly = cy + Math.sin(ang) * (radius + 16) + 4;
+        ctx.fillText(labels[i], lx, ly);
+      }
+      ctx.restore();
+    }
+
+    const STAGE_NAMES = [
+      '360° TURNTABLE',
+      'HITBOX & RIG',
+      'SUIT & SKINS',
+      'WEAPON ARSENAL',
+      'LVL PROGRESSION',
+      'HERO DOSSIER'
+    ];
+
+    const STAGE_SUBS = [
+      ['BIOMETRIC LOCK-ON', '360° ORBITAL TELEMETRY'],
+      ['SKELETAL RIGGING MESH', 'DAMAGE MULTIPLIER ZONES'],
+      ['CHASSIS CHROMATIC SWAPS', 'ARMOR PLATING & MATERIALS'],
+      ['BALLISTIC & MELEE LOADOUT', 'WEAPON MODULES & DPS'],
+      ['TIER EVOLUTION: LVL 1 → 100', 'STAT SCALING & CYBERWARE'],
+      ['NETWATCH COMBAT CARD', 'UNIT READY FOR DEPLOYMENT']
+    ];
+
+    function renderLoop(now) {
+      const elapsed = ((now - startTime) / 1000) % LOOP_DURATION;
+      let stageIdx = Math.min(5, Math.floor(elapsed / 3.0));
+      let stageProg = (elapsed - stageIdx * 3.0) / 3.0;
+
+      if (stageMode !== 'auto') {
+        stageIdx = parseInt(stageMode, 10);
+        stageProg = ((now / 1000) % 3.0) / 3.0;
+      } else {
+        // In AUTO mode, automatically showcase skins in Stage 2, weapons in Stage 3, and levels in Stage 4
+        if (stageIdx === 2) {
+          const autoSkin = Math.min(2, Math.floor(stageProg * 3));
+          if (autoSkin !== currentSkinIdx) applySkin(autoSkin);
+        } else if (stageIdx === 3) {
+          const autoWep = Math.min(2, Math.floor(stageProg * 3));
+          if (autoWep !== currentWeaponIdx) applyWeapon(autoWep);
+        } else if (stageIdx === 4) {
+          const lvls = [1, 50, 100];
+          const autoLvl = lvls[Math.min(2, Math.floor(stageProg * 3))];
+          if (autoLvl !== currentLevel) applyLevel(autoLvl);
+        }
+      }
+
+      if (stageIdx !== lastStageSound) {
+        lastStageSound = stageIdx;
+        playStageBeep(520 + stageIdx * 90);
+      }
+
+      // Wireframe toggle for Stage 1 (Hitbox & Rig)
+      const isWire = (stageIdx === 1);
+      armorPrimaryMat.wireframe = isWire;
+      armorSecondaryMat.wireframe = isWire;
+
+      // Idle breathing & rotation of 3D Character
+      const tSec = now * 0.001;
+      charGroup.position.y = Math.sin(tSec * 2.4) * 0.025;
+      ringMesh1.rotation.z = tSec * 0.8;
+      ringMesh2.rotation.z = -tSec * 1.2;
+      if (lvl100Group.visible) {
+        droneOrb.position.y = 1.85 + Math.sin(tSec * 4) * 0.08;
+        droneOrb.rotation.y = tSec * 3;
+        haloMesh.rotation.z = tSec * 2;
+      }
+
+      // Smoothly animate camera or turntable angle if user is not dragging mouse
+      if (!userInteracting) {
+        if (stageIdx === 3) {
+          // Focus closer on weapon arm during Stage 3 (Arsenal)
+          charGroup.rotation.y = THREE.MathUtils.lerp(charGroup.rotation.y, -0.55 + Math.sin(tSec * 1.2) * 0.25, 0.06);
+          camera.position.lerp(new THREE.Vector3(0.35, 1.38, 3.15), 0.06);
+          controls.target.lerp(new THREE.Vector3(0.22, 1.18, 0.25), 0.06);
+        } else {
+          // Full 360 continuous turntable spin
+          charGroup.rotation.y = (tSec * 0.85) % (Math.PI * 2);
+          camera.position.lerp(new THREE.Vector3(0, 1.50, 4.35), 0.05);
+          controls.target.lerp(new THREE.Vector3(0, 1.12, 0), 0.05);
+        }
+      }
+      controls.update();
+
+      // Render 3D scene
+      renderer.render(scene, camera);
+
+      // Composite HUD + 3D onto main 2D canvas
+      const skin = SKINS[currentSkinIdx];
+      const wep = WEAPONS[currentWeaponIdx];
+      const lvlObj = LEVELS[currentLevel];
+      const acc = skin.glowHex;
+      const rgb = skin.glowRgb;
+
+      // Background Cyber Grid
+      ctx.fillStyle = '#05080e';
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = rgba(rgb, 0.07);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x < W; x += 36) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); }
+      for (let y = 0; y < H; y += 36) { ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); }
+      ctx.stroke();
+
+      // Draw 3D Character WebGL buffer
+      ctx.drawImage(glCanvas, 0, 0);
+
+      // Project 3D Joints to 2D screen space
+      const pHead = project3D(rigJoints3D.head);
+      const pNeck = project3D(rigJoints3D.neck);
+      const pShL = project3D(rigJoints3D.shoulderL);
+      const pShR = project3D(rigJoints3D.shoulderR);
+      const pElL = project3D(rigJoints3D.elbowL);
+      const pElR = project3D(rigJoints3D.elbowR);
+      const pWep = project3D(rigJoints3D.weaponTip);
+      const pCore = project3D(rigJoints3D.core);
+      const pPelvis = project3D(rigJoints3D.pelvis);
+      const pKnL = project3D(rigJoints3D.kneeL);
+      const pKnR = project3D(rigJoints3D.kneeR);
+      const pFtL = project3D(rigJoints3D.footL);
+      const pFtR = project3D(rigJoints3D.footR);
+
+      // STAGE 0: 360 TURNTABLE & ACQUISITION
+      if (stageIdx === 0) {
+        drawCornerBox(370, 96, 340, 540, acc, 22, 2);
+
+        // Degree compass arc around turntable
+        const deg = Math.round(((charGroup.rotation.y * 180 / Math.PI) % 360 + 360) % 360);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText(`TURNTABLE YAW // ${String(deg).padStart(3, '0')}°`, 458, 626);
+
+        drawPanel(740, 122, 312, 210, rgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('UNIT TELEMETRY // LOCK', 758, 152);
+        const rows = [
+          ['OPERATIVE', 'V-09 // VALKYRIE'],
+          ['CLASS', 'CYBER-VANGUARD'],
+          ['CHASSIS', skin.name],
+          ['ACTIVE LVL', `LVL ${currentLevel} (${lvlObj.Power || lvlObj.powerScore} PWR)`],
+          ['ROTATION', `${deg}° / 360° LIVE`]
+        ];
+        rows.forEach(([k, v], i) => {
+          ctx.fillStyle = '#7B9BB0';
+          ctx.font = '11.5px monospace';
+          ctx.fillText(k, 758, 184 + i * 27);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(v, 858, 184 + i * 27);
+        });
+      }
+
+      // STAGE 1: HITBOX & SKELETAL RIG
+      else if (stageIdx === 1) {
+        // Draw 2D projected rig bones
+        const bones = [
+          [pHead, pNeck], [pNeck, pShL], [pNeck, pShR],
+          [pShL, pElL], [pShR, pElR], [pElR, pWep],
+          [pNeck, pCore], [pCore, pPelvis],
+          [pPelvis, pKnL], [pPelvis, pKnR],
+          [pKnL, pFtL], [pKnR, pFtR]
+        ];
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        bones.forEach(([a, b]) => { ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); });
+        ctx.stroke();
+
+        // Joint nodes
+        [pHead, pNeck, pShL, pShR, pElL, pElR, pCore, pPelvis, pKnL, pKnR, pFtL, pFtR].forEach(([jx, jy]) => {
+          ctx.fillStyle = '#05080e';
+          ctx.strokeStyle = acc;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(jx, jy, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        });
+
+        // Hitbox Multiplier Boxes
+        drawCornerBox(pHead[0] - 42, pHead[1] - 42, 84, 78, '#FF2A85', 10, 1.8);
+        ctx.fillStyle = '#FF2A85';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('CRIT HITBOX // 2.5x DMG', pHead[0] + 54, pHead[1] - 10);
+
+        drawCornerBox(pCore[0] - 68, pCore[1] - 58, 136, 128, acc, 12, 1.5);
+        ctx.fillStyle = acc;
+        ctx.fillText('TORSO ARMOR // 1.0x DMG', pCore[0] + 78, pCore[1]);
+
+        drawCornerBox(pKnL[0] - 55, pKnL[1] - 35, 160, 150, '#FCEE09', 10, 1.4);
+        ctx.fillStyle = '#FCEE09';
+        ctx.fillText('CYBER LIMBS // 0.75x DMG', pKnR[0] + 55, pKnR[1] + 20);
+
+        drawPanel(740, 122, 312, 165, rgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('RIGGING & TOPOLOGY', 758, 152);
+        ctx.fillStyle = '#EBF9FF';
+        ctx.font = '12px monospace';
+        ctx.fillText('BONE JOINTS: 13 ACTIVE NODES', 758, 184);
+        ctx.fillText('WIREFRAME MESH: ENABLED', 758, 210);
+        ctx.fillText('HEADSHOT MULTIPLIER: 250%', 758, 236);
+        ctx.fillText('COLLISION CAPSULES: VERIFIED', 758, 262);
+      }
+
+      // STAGE 2: SUIT & SKINS SHOWCASE
+      else if (stageIdx === 2) {
+        drawPanel(735, 118, 318, 360, rgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('CHASSIS & SKIN VARIANTS', 753, 148);
+        ctx.fillStyle = '#7B9BB0';
+        ctx.font = '11px monospace';
+        ctx.fillText(skin.code, 753, 170);
+
+        SKINS.forEach((sk, i) => {
+          const y = 196 + i * 74;
+          const isCur = (i === currentSkinIdx);
+          ctx.fillStyle = isCur ? rgba(sk.glowRgb, 0.16) : 'rgba(255,255,255,0.03)';
+          ctx.fillRect(750, y, 288, 60);
+          ctx.strokeStyle = isCur ? sk.glowHex : 'rgba(255,255,255,0.12)';
+          ctx.strokeRect(750.5, y + 0.5, 287, 59);
+
+          // Swatch
+          ctx.fillStyle = sk.glowHex;
+          ctx.fillRect(764, y + 16, 28, 28);
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 12.5px monospace';
+          ctx.fillText(sk.name, 804, y + 25);
+          ctx.fillStyle = sk.glowHex;
+          ctx.font = '11px monospace';
+          ctx.fillText(`${sk.armorBonus} · ${sk.manufacturer}`, 804, y + 44);
+        });
+
+        // Callout lines to armor parts
+        const callouts = [
+          [pHead, 'NEURAL VISOR // OPTIC MK.V', 330, 165],
+          [pCore, 'GRAPHENE CHEST REACTOR', 330, 290],
+          [pKnL, 'HYDRAULIC MYOMER GREAVES', 330, 465]
+        ];
+        callouts.forEach(([pt, label, lx, ly]) => {
+          ctx.strokeStyle = rgba(rgb, 0.75);
+          ctx.beginPath();
+          ctx.moveTo(pt[0], pt[1]);
+          ctx.lineTo(lx + 190, ly - 4);
+          ctx.stroke();
+          ctx.fillStyle = acc;
+          ctx.fillText(label, lx, ly);
+        });
+      }
+
+      // STAGE 3: WEAPON ARSENAL & MODULES
+      else if (stageIdx === 3) {
+        // Highlight box around 3D weapon
+        drawCornerBox(pWep[0] - 95, pWep[1] - 75, 190, 150, acc, 16, 2);
+
+        drawPanel(725, 118, 328, 395, rgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('EQUIPPED WEAPON LOADOUT', 744, 148);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText(wep.name, 744, 180);
+        ctx.fillStyle = '#FCEE09';
+        ctx.font = '11.5px monospace';
+        ctx.fillText(wep.type, 744, 200);
+
+        const wStats = [
+          ['DAMAGE RATING', wep.dmg],
+          ['FIRE RATE', wep.rpm],
+          ['EFFECTIVE RANGE', wep.range],
+          ['AMMO / POWER', wep.ammo],
+          ['SPECIAL PERK', wep.perk]
+        ];
+        wStats.forEach(([k, v], i) => {
+          const sy = 236 + i * 32;
+          ctx.fillStyle = '#7B9BB0';
+          ctx.font = '11px monospace';
+          ctx.fillText(k, 744, sy);
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = 'bold 12px monospace';
+          ctx.fillText(v, 868, sy);
+        });
+
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('ATTACHED MODULES:', 744, 412);
+        wep.parts.forEach((pt, i) => {
+          ctx.fillStyle = '#EBF9FF';
+          ctx.font = '11.5px monospace';
+          ctx.fillText(`▸ ${pt}`, 744, 436 + i * 22);
+
+          // Callout line from weapon to module list
+          ctx.strokeStyle = rgba(rgb, 0.38);
+          ctx.beginPath();
+          ctx.moveTo(pWep[0] + (i - 1) * 18, pWep[1] + (i - 1) * 12);
+          ctx.lineTo(725, 432 + i * 22);
+          ctx.stroke();
+        });
+      }
+
+      // STAGE 4: LEVEL PROGRESSION (LVL 1 -> LVL 50 -> LVL 100) + RADAR CHART
+      else if (stageIdx === 4) {
+        drawPanel(725, 110, 328, 490, rgb);
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 15px monospace';
+        ctx.fillText(`LEVEL EVOLUTION // LVL ${currentLevel}`, 744, 140);
+        ctx.fillStyle = '#FCEE09';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText(lvlObj.tier, 744, 162);
+
+        const sRows = [
+          ['HIT POINTS (HP)', lvlObj.hp],
+          ['ATTACK POWER', lvlObj.atk],
+          ['ARMOR DEFENSE', lvlObj.def],
+          ['AGILITY / SPEED', lvlObj.spd],
+          ['CRIT CHANCE', lvlObj.crit],
+          ['COMBAT RATING', lvlObj.powerScore]
+        ];
+        sRows.forEach(([k, v], i) => {
+          const ry = 194 + i * 26;
+          ctx.fillStyle = '#7B9BB0';
+          ctx.font = '11px monospace';
+          ctx.fillText(k, 744, ry);
+          ctx.fillStyle = i === 5 ? '#FCEE09' : '#FFFFFF';
+          ctx.font = 'bold 12.5px monospace';
+          ctx.fillText(String(v), 915, ry);
+        });
+
+        // Draw 5-axis Radar Pentagon Chart
+        drawRadarChart(
+          888,
+          468,
+          82,
+          lvlObj.statsNorm,
+          ['HP', 'ATK', 'DEF', 'SPD', 'TECH'],
+          rgb
+        );
+      }
+
+      // STAGE 5: HERO DOSSIER & ULTIMATE CARD
+      else if (stageIdx === 5) {
+        const isGlitch = (stageMode === 'auto' && stageProg > 0.86);
+        drawCornerBox(355, 88, 370, 548, acc, 26, 2.2);
+
+        drawPanel(715, 118, 338, 420, rgb);
+        ctx.fillStyle = '#FCEE09';
+        ctx.font = 'bold 12px monospace';
+        ctx.fillText('★★★ SSR LEGENDARY OPERATIVE ★★★', 735, 146);
+
+        ctx.fillStyle = acc;
+        ctx.font = 'bold 18px monospace';
+        ctx.fillText(isGlitch ? 'ERR_0x99 // REBOOT' : 'TARGET LOCKED: V-09', 735, 174);
+
+        const dRows = [
+          ['CODENAME', 'VALKYRIE // V-09'],
+          ['ACTIVE SKIN', skin.name],
+          ['PRIMARY WEAPON', wep.name.slice(0, 20)],
+          ['ASCENSION LEVEL', `LVL ${currentLevel} (MAX TIER)`],
+          ['POWER RATING', lvlObj.powerScore],
+          ['ULTIMATE SKILL', 'OVERCLOCK EMP NOVA'],
+          ['DEPLOYMENT', 'READY // 99.9% SYNC']
+        ];
+        dRows.forEach(([k, v], i) => {
+          const y = 214 + i * 38;
+          ctx.fillStyle = '#7B9BB0';
+          ctx.font = '11.5px monospace';
+          ctx.fillText(k, 735, y);
+          ctx.fillStyle = i >= 4 ? acc : '#FFFFFF';
+          ctx.font = 'bold 12.5px monospace';
+          ctx.fillText(v, 868, y);
+        });
+
+        if (isGlitch) {
+          for (let g = 0; g < 8; g++) {
+            const sy = Math.floor(Math.random() * (H - 40));
+            const sh = Math.floor(10 + Math.random() * 26);
+            const dx = Math.floor((Math.random() - 0.5) * 42);
+            ctx.drawImage(mainCanvas, 0, sy, W, sh, dx, sy, W, sh);
+          }
+        }
+      }
+
+      // Persistent HUD Chrome (Top Bar, Left Pipeline Panel, Bottom Telemetry Bar)
+      drawHUDChrome(elapsed, stageIdx, stageProg, skin, wep, lvlObj);
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawHUDChrome(elapsed, stageIdx, stageProg, skin, wep, lvlObj) {
+      const acc = skin.glowHex;
+      const rgb = skin.glowRgb;
+
+      // Top Header Overlay
+      ctx.fillStyle = 'rgba(5, 8, 14, 0.82)';
+      ctx.fillRect(0, 0, W, 74);
+      ctx.strokeStyle = rgba(rgb, 0.38);
+      ctx.beginPath();
+      ctx.moveTo(22, 74);
+      ctx.lineTo(W - 22, 74);
+      ctx.stroke();
+
+      ctx.fillStyle = '#FF2A85';
+      ctx.beginPath();
+      ctx.arc(36, 30, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('LIVE 3D RIG', 50, 35);
+      ctx.fillStyle = acc;
+      ctx.fillText('// CYBERPUNK CHARACTER SHOWCASE HUD', 152, 35);
+
+      ctx.fillStyle = '#7B9BB0';
+      ctx.font = '11px monospace';
+      ctx.fillText(`SKIN: ${skin.name}   |   WEAPON: ${wep.name}   |   TIER: LVL ${currentLevel}`, 30, 58);
+
+      const sec = Math.floor(elapsed);
+      const ms = Math.floor((elapsed - sec) * 60);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText(`00:00:${String(sec).padStart(2, '0')}:${String(ms).padStart(2, '0')}`, 885, 35);
+      ctx.fillStyle = acc;
+      ctx.font = '11px monospace';
+      ctx.fillText('60 FPS / WEBGL 3D', 895, 58);
+
+      // Left Stage Pipeline Panel
+      drawPanel(24, 110, 275, 340, rgb);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 13.5px monospace';
+      ctx.fillText('CHARACTER PIPELINE', 42, 142);
+      ctx.fillStyle = '#7B9BB0';
+      ctx.font = '11px monospace';
+      ctx.fillText('UNIT V-09  /  INTERACTIVE 3D', 42, 162);
+
+      STAGE_NAMES.forEach((st, i) => {
+        const y = 196 + i * 36;
+        if (i === stageIdx) {
+          ctx.fillStyle = rgba(rgb, 0.16);
+          ctx.fillRect(34, y - 17, 255, 26);
+          ctx.strokeStyle = acc;
+          ctx.strokeRect(34.5, y - 16.5, 254, 25);
+        }
+        ctx.fillStyle = i <= stageIdx ? '#FFFFFF' : '#698296';
+        ctx.font = i === stageIdx ? 'bold 12.5px monospace' : '12.5px monospace';
+        ctx.fillText(`0${i + 1}`, 44, y);
+        ctx.fillText(st, 78, y);
+
+        if (i < stageIdx) {
+          ctx.fillStyle = acc;
+          ctx.fillText('✓', 268, y);
+        } else if (i === stageIdx) {
+          ctx.fillStyle = '#FCEE09';
+          ctx.fillRect(268, y - 8, 8, 8);
+        }
+      });
+
+      // Progress bar
+      const prog = stageMode === 'auto' ? (elapsed / LOOP_DURATION) : ((stageIdx + stageProg) / 6);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(42, 424, 238, 4);
+      ctx.fillStyle = acc;
+      ctx.fillRect(42, 424, 238 * Math.min(1, prog), 4);
+
+      // Lower-left Stage Callout
+      ctx.fillStyle = '#FCEE09';
+      ctx.font = 'bold 12px monospace';
+      ctx.fillText(`STAGE 0${stageIdx + 1} / 06`, 26, 495);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 21px monospace';
+      ctx.fillText(STAGE_NAMES[stageIdx], 26, 526);
+      ctx.fillStyle = '#7B9BB0';
+      ctx.font = '11.5px monospace';
+      ctx.fillText(STAGE_SUBS[stageIdx][0], 26, 552);
+      ctx.fillText(STAGE_SUBS[stageIdx][1], 26, 572);
+
+      // Bottom Status Bar
+      ctx.fillStyle = 'rgba(5, 8, 14, 0.85)';
+      ctx.fillRect(0, H - 48, W, 48);
+      ctx.strokeStyle = rgba(rgb, 0.38);
+      ctx.beginPath();
+      ctx.moveTo(22, H - 48);
+      ctx.lineTo(W - 22, H - 48);
+      ctx.stroke();
+
+      ctx.fillStyle = acc;
+      ctx.font = 'bold 12.5px monospace';
+      ctx.fillText(`OPERATIVE: V-09 VALKYRIE`, 28, H - 19);
+      ctx.fillStyle = '#EBF9FF';
+      ctx.fillText(`POWER SCORE: ${lvlObj.powerScore}   //   DRAG MOUSE TO ROTATE 360°`, 280, H - 19);
+      ctx.fillStyle = '#FCEE09';
+      ctx.fillText('NIGHT CITY MERCENARY ARCHIVE', 790, H - 19);
+    }
+
+    requestAnimationFrame(renderLoop);
+
+    // UI Controls Wiring
+    document.getElementById('stageRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-stage]');
+      if (!btn) return;
+      stageMode = btn.dataset.stage;
+      document.querySelectorAll('#stageRow .btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+
+    document.getElementById('skinRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-skin]');
+      if (!btn) return;
+      applySkin(parseInt(btn.dataset.skin, 10));
+      playStageBeep(720);
+    });
+
+    document.getElementById('weaponRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-weapon]');
+      if (!btn) return;
+      applyWeapon(parseInt(btn.dataset.weapon, 10));
+      playStageBeep(580);
+    });
+
+    document.getElementById('levelRow').addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-level]');
+      if (!btn) return;
+      applyLevel(parseInt(btn.dataset.level, 10));
+      playStageBeep(840);
+    });
+
+    const soundBtn = document.getElementById('soundBtn');
+    soundBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundBtn.textContent = soundEnabled ? '🔊 ЗВУК: ВКЛ' : '🔇 ЗВУК: ВЫКЛ';
+      if (soundEnabled) playStageBeep(660);
+    });
+
+    const recordBtn = document.getElementById('recordBtn');
+    recordBtn.addEventListener('click', () => {
+      if (recordBtn.disabled) return;
+      const stream = mainCanvas.captureStream(30);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cyberpunk-character-hud.webm';
+        a.click();
+        recordBtn.disabled = false;
+        recordBtn.textContent = '⏺ ЭКСПОРТ WEBM';
+      };
+      stageMode = 'auto';
+      startTime = performance.now();
+      recordBtn.disabled = true;
+      recordBtn.textContent = '⏳ ЗАПИСЬ 18 СЕК...';
+      recorder.start();
+      setTimeout(() => recorder.stop(), LOOP_DURATION * 1000);
+    });
+  </script>
+</body>
+</html>
